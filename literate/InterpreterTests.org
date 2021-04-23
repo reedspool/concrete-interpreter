@@ -1,0 +1,60 @@
+#+TITLE: Interpreter Tests
+#+PROPERTY: header-args    :comments both :tangle ../test/Interpreter.test.js
+
+* Preamble
+
+#+begin_src js
+import { interpretFile } from "../src/Interpreter";
+#+end_src
+
+* Tests
+
+Simple empty source should not have a result.
+
+#+begin_src js
+it("Empty source produces no result", async () => {
+    const input = "";
+    const result = await interpretFile(input);
+    expect(result).toEqual([]);
+});
+#+end_src
+
+#+begin_src js
+it("A number produces a JS number as a result", async () => {
+    const input = "3355.4432";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(3355.4432);
+});
+#+end_src
+
+#+begin_src js
+it("A string produces a JS string as a result", async () => {
+    const input = "\"Hello World!\"";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual("Hello World!");
+});
+#+end_src
+
+#+begin_src js
+it("A blank produces a JS `null` as a result", async () => {
+    const input = "_";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(null);
+});
+#+end_src
+
+#+begin_src js
+it("Multiple blocks with a comma separating them produces both as a result", async () => {
+    const input = "1, 2";
+    const result = await interpretFile(input);
+    expect(result).toEqual([1, 2]);
+});
+#+end_src
+
+#+begin_src js
+it("Multiple blocks without a comma separating them produces only the latter as a result", async () => {
+    const input = "1 2";
+    const result = await interpretFile(input);
+    expect(result).toEqual([2]);
+});
+#+end_src

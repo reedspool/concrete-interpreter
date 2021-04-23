@@ -1,0 +1,34 @@
+#+TITLE: Runnable Interpreter Machine Tests
+#+PROPERTY: header-args    :comments both :tangle ../test/RunMachine.test.js
+
+* Preamble
+
+#+begin_src js
+import { Machine } from "xstate";
+import * as RunMachine from "../src/RunMachine";
+import { Frame } from "../src/Frame";
+import { parseFile } from "concrete-parser";
+import { TestInterpreter, toMatchState } from "xstate-jest-tools";
+expect.extend({ toMatchState });
+
+const runMachine =
+    Machine(RunMachine.definition)
+        .withConfig(RunMachine.config)
+        // Supply empty context to avoid warning
+        .withContext({});
+
+let interpreter;
+
+beforeEach(() => {
+    interpreter = TestInterpreter(runMachine);
+})
+#+end_src
+
+* Tests
+
+#+begin_src js
+it("Can be instantiated", () => {
+    expect(runMachine).toBeDefined();
+    expect(interpreter).toBeDefined();
+})
+#+end_src

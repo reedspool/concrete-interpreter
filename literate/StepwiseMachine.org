@@ -1,0 +1,286 @@
+#+TITLE: Stepwise Interpreter Machine
+#+PROPERTY: header-args    :comments both :tangle ../src/StepwiseMachine.js
+
+This XState Machine will interpret Concrete programs in a step-wise fashion, that is it will take only minimal steps forward each time it receives a =step= event from its parent. Its purpose is to facilitate step-wise debugging. To run a program continuously, a parent machine should invoke this and keep sending =step= events until the interpreter halts or errs.
+
+* Preamble
+
+#+begin_src js
+import { Machine, sendParent } from "xstate";
+import { assign } from "@xstate/immer";
+import { Frame } from "./Frame";
+import { Category } from "concrete-parser";
+#+end_src
+
+* Definition
+
+Begin the definition, we'll explain each state in turn:
+
+#+begin_src js
+export const definition = {
+    id: "StepwiseInterpreter",
+    strict: true,
+#+end_src
+
+The interpreter will always start in the "empty" state, because it doesn't have any code to run. It will proceed if it receives some code to run.
+
+The "states" object is left open, because there are many more to define.
+
+#+begin_src js
+    initial: "empty",
+    states: {
+        empty: {
+            on: {
+                LOAD_PROGRAM: {
+                    target: "run",
+                    actions: [ "loadProgram" ]
+                }
+            }
+        },
+#+end_src
+
+Once the program is loaded, we are going to be inside "run" until the program finishes or crashes.
+
+The "run" state is complex. It always starts in the sub-state where it checks if the reader head is beyond the edge. This is important because the loaded program might be empty, in which case it should immediately halt. Otherwise, we proceed to the normal "read" phase.
+
+#+begin_src js
+        run: {
+            initial: "checkPastTapeEdge",
+            states: {
+                checkPastTapeEdge: {
+                    always: [
+                        {
+                            cond: "isBeyondEdge",
+                            target: "#StepwiseInterpreter.halted"
+                        },
+                        "read"
+                    ]
+                },
+#+end_src
+
+To interpret a Concrete program is to loop over each cell of the program's tape and take some action. Which action to take depends on which block is in the current cell. We record it before acting on that information to facilitate the intended "step-wise" nature.
+
+At the beginning of the program, the reader head is at the first cell. Later, the program will return to this state but the reader head will have progressed to a different cell.
+
+Upon proceeding, we branch depending on the category of that block.
+
+#+begin_src js
+                read: {
+                    entry: [ "recordCurrentBlockAtHead", "reportReadyToStep" ],
+                    on : {
+                        STEP: [
+                            {
+                                cond: "isCurrentBlockValue",
+                                target: "executeValue"
+                            },
+                            {
+                                cond: "isCurrentBlockOp",
+                                target: "executeOp"
+                            },
+                            {
+                                actions: [ "reportErrorInvalidCategoryOfCurrentBlock" ],
+                                target: "#StepwiseInterpreter.error"
+                            }
+                        ]
+                    }
+                },
+#+end_src
+
+TODO
+
+#+begin_src js
+                executeOp: {},
+#+end_src
+
+If there is a comma preceding the current block, we grow the argument list by appending the current block. If there is no comma, the argument list will only contain the current block, dumping its previous contents.
+
+#+begin_src js
+                executeValue: {
+                    entry: [ "reportReadyToStep" ],
+                    on : {
+                        STEP: [
+                            {
+                                cond: "isCommaAtHead",
+                                target: "advance",
+                                actions: [ "appendArgumentsWithCurrentBlock" ]
+                            },
+                            {
+                                target: "advance",
+                                actions: [ "replaceArgumentsWithCurrentBlock" ]
+                            }
+                        ]
+                    }
+                },
+#+end_src
+
+In general, once we've done whatever we're going to do with this block, we move one place to the right. There are exceptions to this, such as if a tape halts or if the head jumps.
+
+After advancing, we go "back to the top" in the read-eval-advance cycle, first checking if we've moved past the edge of the tape and must halt.
+
+#+begin_src js
+                advance: {
+                    entry: [ "reportReadyToStep" ],
+                    on : {
+                        STEP: {
+                            target: "checkPastTapeEdge",
+                            actions: [ "advanceHead" ]
+                        }
+                    }
+                },
+#+end_src
+
+Closing "run" internal states map as well as itself.
+
+#+begin_src js
+            }
+        },
+#+end_src
+
+A program which has completed interpretation normally will find itself, finally, in the "halted" state
+
+#+begin_src js
+        halted: {
+            type : "final",
+            entry : [ "haltFrame", "storeResult" ],
+            data : (C) => C
+        },
+#+end_src
+
+The other way a program can end is in the error state.
+
+#+begin_src js
+        error: {
+            type : "final",
+            entry : [ "haltFrame", "storeResult" ],
+            data : (C) => C
+        },
+#+end_src
+
+We're done with states, so close the state map:
+
+#+begin_src js
+    },
+#+end_src
+
+
+And finally, close up the definition:
+
+#+begin_src js
+};
+#+end_src
+
+* Configuration
+
+Start with actions.
+
+#+begin_src js
+export const config = {
+    actions: {
+#+end_src
+
+When the program loads, the source is an Abstract Syntax Tree. We need to create an active stack frame for it.
+
+The rest of the stack is empty.
+
+#+begin_src js
+        loadProgram: assign((C, E) => {
+            C.source = E.source;
+            C.activeFrame = Frame(C.source);
+            C.stack = [];
+        }),
+#+end_src
+
+Determine what is the category of the block at the head of the current cell.
+
+#+begin_src js
+        recordCurrentBlockAtHead : assign((C, E) => {
+            C.currentBlock = C.activeFrame.getBlockAtHead();
+        }),
+#+end_src
+
+Depending on the circumstances, we do or do not clear the current argument list before adding the current block. See "executeValue" above.
+
+#+begin_src js
+        appendArgumentsWithCurrentBlock : assign((C, E) => {
+            C.activeFrame.appendBlockToArguments(C.currentBlock);
+        }),
+        replaceArgumentsWithCurrentBlock : assign((C, E) => {
+            C.activeFrame.clearArguments();
+            C.activeFrame.appendBlockToArguments(C.currentBlock);
+        }),
+#+end_src
+
+Advance the head of the tape one to the right.
+
+#+begin_src js
+        advanceHead : assign((C, E) => {
+            C.activeFrame.advance();
+        }),
+#+end_src
+
+When the program ends or the current tape ends, we set the frame to halted.
+
+#+begin_src js
+        haltFrame : assign((C, E) => {
+            C.activeFrame.halt();
+        }),
+#+end_src
+
+When the program ends or the current tape ends, put the result in an easy-to-grab place.
+
+#+begin_src js
+        storeResult : assign((C, E) => {
+        }),
+#+end_src
+
+When the interpreter encounters a run-time error, that is not an exception in the JavaScript run-time. Save an error object without throwing it.
+
+#+begin_src js
+        reportErrorInvalidCategoryOfCurrentBlock : assign((C, E) => {
+            C.error = new Error("Invalid category of current block");
+        }),
+#+end_src
+
+Let our parent know when they can safely send a "STEP" event. When our parent wants to successively step through the whole program, this will ensure they don't send too many "STEP" events. When our parent is a step debugger UI, if they don't receive this event in a very short period of time, they could move to a "working" state to show that the UI isn't ready to be stepped forward yet.
+
+#+begin_src js
+        reportReadyToStep : sendParent((C, E) => {
+            return { type: "READY_TO_STEP" };
+        }),
+#+end_src
+
+Done with actions, now onto guards. Note guards appear in the above machine in "cond" fields. See XState docs for more.
+
+#+begin_src js
+    },
+    guards: {
+#+end_src
+
+Many guards are obvious from the perspective of the machine, we just defer them to other objects.
+
+#+begin_src js
+        isBeyondEdge : (C, E) => C.activeFrame.isBeyondEdge(),
+        isCommaAtHead : (C, E) => C.activeFrame.isCommaAtHead(),
+#+end_src
+
+We need to check the category of the current block in order to branch execution.
+
+#+begin_src js
+        isCurrentBlockValue : (C, E) => C.currentBlock.is(Category.Value),
+        isCurrentBlockOp : (C, E) => C.currentBlock.is(Category.Op),
+#+end_src
+
+Close final config maps.
+
+#+begin_src js
+    }
+}
+#+end_src
+
+* Initialize
+
+Start with an empty context.
+
+#+begin_src js
+export const init = () => Machine(definition, config).withContext({});
+#+end_src

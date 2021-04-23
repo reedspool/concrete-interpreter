@@ -1,0 +1,115 @@
+#+TITLE: Concrete Interpreter
+
+Interpreter for the Concrete Programming Language, written in Literate Programming (LP) style using Emacs's Org-mode Babel.
+
+* Usage
+
+TBD
+
+* Note on Work In Progress
+This whole project is a work in progress. Because it is in the literate style and I want to record all my thoughts, you will find messes. Some sentences may stop mid-thought. I will be editing as I work, and I will try to make it clear when a thought and its corresponding code is complete.
+
+* Motivation
+
+I wanted to write new a parser for my programming language, Concrete. Previously, I used PEG.js, which was great.
+
+There are two main reasons I wanted to do this.
+
+First, I wanted to write a statechart-based parser with XState, so I could step through it like the step debugger.
+
+Second, I wanted to try a piecemeal parser, where blocks could be emitted as they are parsed. I'm not sure why I think that would be cool, but I wanted to try.
+
+* Installation
+
+Tests in this repo rely my package =xstate-jest-tools= which I have not yet published to NPM.
+
+=npm update= unfortunately does not work with github-installed modules. So, to install and to update, call this:
+
+If you are using Emacs, you can just hit =C-c C-c= with your cursor in the following block.
+
+#+begin_src sh :tangle no :results silent raw
+npm install -D https://github.com/reedspool/xstate-jest-tools \
+    https://github.com/reedspool/concrete-parser \
+    https://github.com/reedspool/inverted-promise
+#+end_src
+
+* How to generate source files in this project
+
+I use Emacs's =org-babel-tangle= to automatically generate all the source files from this file and each file in the =literate= directory.
+
+Whenever I edit one of the =.org= files in this project, I manually run =org-babel-tangle=. I am planning to automate this soon.
+
+If you do not use Emacs as an editor, it is possible to run this using Emacs as a CLI.
+
+* How to run tests
+
+Most of the time, I run jest in watch mode, to re-run the tests everytime any file is changed.
+
+#+begin_src sh
+npm test # runs jest --watchAll
+#+end_src
+
+To run just all tests just once:
+
+#+begin_src sh
+npm run test-once # runs jest
+#+end_src
+
+* Using the library
+
+TBD: I'm still exploring the best way to do this, and even if this library will be useful at all.
+* Explanation for miscellaneous files
+** =babel.config.js=
+:PROPERTIES:
+:header-args: :comments both :tangle babel.config.js
+:END:
+
+Line-by-line, starting at the beginning:
+
+#+begin_src js
+module.exports = {
+#+end_src
+
+Jest unfortunately does not work out of the box with =import= syntax.
+
+I solved this issue by adding a single dependency, =@babel/preset-env,= and a single file, =babel.config.js=:
+
+#+begin_src js
+    presets: [ "@babel/preset-env" ],
+#+end_src
+
+When I started using async/await inside my Jest tests, I got this error:
+
+=ReferenceError: regeneratorRuntime is not defined=
+
+[[https://github.com/facebook/jest/issues/3126#issuecomment-723998132][This github comment]] suggested the following remedy:
+
+#+begin_src js
+    targets: { node: 'current' },
+#+end_src
+
+
+And finally:
+
+#+begin_src js
+};
+#+end_src
+
+** =jest.config.js=
+:PROPERTIES:
+:header-args: :comments both :tangle jest.config.js
+:END:
+
+Because my custom packages are not Babel-transformed yet, this project must specifically inform Jest's Babel transformer to *not* ignore it, and transform it as well:
+
+- =xstate-jest-tools=
+- =concrete-parser=
+- =inverted-promise=
+
+#+begin_src js
+module.exports = {
+    transformIgnorePatterns: [
+        "node_modules/(?!xstate-jest-tools|concrete-parser|inverted-promise)"
+    ]
+}
+#+end_src

@@ -1,0 +1,82 @@
+#+TITLE: Interpreter
+#+PROPERTY: header-args    :comments both :tangle ../src/Interpreter.js
+
+Function to take a string of source code and interpret it to completion.
+
+* Preamble
+
+#+begin_src js
+import * as RunMachine from "./RunMachine";
+import { parseFile } from "concrete-parser";
+import { interpret } from "xstate";
+import { InvertedPromise as Promise } from "inverted-promise";
+#+end_src
+
+* Interpret File
+
+Every time we instantiate a new run machine and start it up in an XState interpreter. It won't do anything until it gets the source.
+
+#+begin_src js
+export const interpretFile = async (source) => {
+    const runMachine = RunMachine.init();
+    const runInterpreter = interpret(runMachine).start();
+#+end_src
+
+Prepare a promise that will resolve to the result of the interpreted program.
+
+#+begin_src js
+    const result = Promise();
+#+end_src
+
+Before starting anything, set up the event listeners for the completion of the interpretation of the program. The machine will either end successfully which we catch with =onDone()=, or in failure which we catch with =onError()=.
+
+The first thing to do in either case is stop the interpreter itself.
+
+If the program ended successfully, resolve the result promise with the reported result, which is an array of blocks.
+
+Convert all the blocks in that array to their JS equivalents. This might error if any of those blocks are unable to convert to JS.
+
+TODO: How do we get errors out of this thing? Like onError but that doesn't exist.
+
+#+begin_src js
+    runInterpreter.onDone(({ data }) => {
+        runInterpreter.stop();
+        result.resolve(data.map(block => block.asJS()));
+    });
+#+end_src
+
+Parse the source and send it to the interpreter. It won't do anything since it starts paused.
+
+#+begin_src js
+    const tree = await parseFile(source);
+#+end_src
+
+If the tree is empty, do not even start the interpreter. If we did start the interpreter, it would halt before receiving the first "STEP", which would be an error.
+
+Return the equivalent of no result, which is an empty array.
+
+#+begin_src js
+    if (tree.isEmpty()) {
+        result.resolve([]);
+        return result;
+    }
+#+end_src
+
+Before turning the interpreter on, send the program so it can prepare.
+
+#+begin_src js
+    runInterpreter.send({ type: "LOAD_PROGRAM", source : tree });
+#+end_src
+
+Finally, switch the interpreter into gear by telling it to run.
+
+#+begin_src js
+    runInterpreter.send("RUN");
+#+end_src
+
+Return the result promise and we're done.
+
+#+begin_src js
+    return result;
+};
+#+end_src

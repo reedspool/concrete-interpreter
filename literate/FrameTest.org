@@ -1,0 +1,61 @@
+#+TITLE: Stack Frame Test
+#+PROPERTY: header-args    :comments both :tangle ../test/Frame.test.js
+
+* Preamble
+
+#+begin_src js
+import { Frame } from "../src/Frame";
+import { parseFile, Category } from "concrete-parser";
+#+end_src
+
+* Tests
+
+#+begin_src js
+it("Can be instantiated", async () => {
+    const tree = await parseFile("1 2 3");
+    const frame = Frame(tree);
+    expect(frame).toBeDefined();
+    expect(frame.tree).toBeDefined();
+    expect(frame.length).toBe(3);
+    expect(frame.head).toBe(0);
+    expect(frame.halted).toBe(false);
+    expect(frame.getBlockAtHead().is(Category.Value))
+        .toBe(true);
+});
+#+end_src
+
+#+begin_src js
+it("Advance until isBeyondEdge", async () => {
+    const tree = await parseFile("1 2 3");
+    const frame = Frame(tree);
+    expect(frame.head).toBe(0);
+    expect(frame.isBeyondEdge()).toBe(false);
+    frame.advance();
+    expect(frame.isBeyondEdge()).toBe(false);
+    frame.advance();
+    expect(frame.isBeyondEdge()).toBe(false);
+    frame.advance();
+    expect(frame.isBeyondEdge()).toBe(true);
+});
+#+end_src
+
+#+begin_src js
+it("Can work with commas with argument lists", async () => {
+    // Simulate what the interpreter would do with argument lists
+    const tree = await parseFile("1, 2 3");
+    const frame = Frame(tree);
+    expect(frame.isCommaAtHead()).toBeFalsy();
+    frame.appendBlockToArguments(frame.getBlockAtHead());
+    
+    frame.advance();
+    expect(frame.isCommaAtHead()).toBe(true);
+    frame.appendBlockToArguments(frame.getBlockAtHead());
+    expect(frame.arguments).toHaveLength(2);
+    
+    frame.advance();
+    expect(frame.isCommaAtHead()).toBeFalsy();
+    frame.clearArguments();
+    frame.appendBlockToArguments(frame.getBlockAtHead());
+    expect(frame.arguments).toHaveLength(1);
+})
+#+end_src

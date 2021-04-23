@@ -1,0 +1,34 @@
+#+TITLE: Stack Frame
+#+PROPERTY: header-args    :comments both :tangle ../src/Frame.js
+
+Factory because I hate =new= keyword.
+
+#+begin_src js
+export const Frame = (...args) => new _Frame(...args);
+#+end_src
+
+#+begin_src js
+class _Frame {
+    constructor (tree) {
+        this.tree = tree;
+        this.length = this.tree.tape.cells.length;
+        this.head = 0;
+        this.halted = false;
+        this.arguments = [];
+    }
+
+    isBeyondEdge() { return this.head >= this.length; }
+
+    advance() { this.head++; }
+    
+    halt() { this.halted = true; }
+    
+    getBlockAtHead() { return this.tree.tape.cells[this.head]; }
+
+    isCommaAtHead() { return this.tree.tape.commas[this.head]; }
+
+    clearArguments() { this.arguments = []; }
+    
+    appendBlockToArguments(block) { this.arguments.push(block); }
+}
+#+end_src
