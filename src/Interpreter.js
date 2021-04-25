@@ -7,6 +7,7 @@ import { parseFile } from "concrete-parser";
 import { interpret } from "xstate";
 import { InvertedPromise as Promise } from "inverted-promise";
 import { service as addExecutorService } from "./executors/add";
+import { service as multiplyExecutorService } from "./executors/multiply";
 // Preamble:1 ends here
 
 // Interpret File
@@ -35,17 +36,20 @@ export const interpretFile = async (source) => {
 
 // The first thing to do in either case is stop the interpreter itself.
 
+// Second, check if the program ended in error. If it did, report that error by rejecting our promise.
+
 // If the program ended successfully, resolve the result promise with the reported result, which is an array of blocks.
 
 // Convert all the blocks in that array to their JS equivalents. This might error if any of those blocks are unable to convert to JS.
-
-// TODO: How do we get errors out of this thing? Like onError but that doesn't exist.
 
 
 // [[file:../literate/Interpreter.org::*Interpret File][Interpret File:3]]
     runInterpreter.onDone(({ data }) => {
         runInterpreter.stop();
-        result.resolve(data.map(block => block.asJS()));
+
+        if (data.error) result.reject(data);
+        else result.resolve(
+            data.results.map(block => block.asJS()));
     });
 // Interpret File:3 ends here
 
@@ -88,7 +92,8 @@ export const interpretFile = async (source) => {
 
 // [[file:../literate/Interpreter.org::*Interpret File][Interpret File:7]]
     [
-        { label: "add", service: addExecutorService }
+        { label: "add", service: addExecutorService },
+        { label: "multiply", service: multiplyExecutorService }
     ].forEach(
         ({ label, service }) => runInterpreter.send(
             { type: "LOAD_GLOBAL_LABEL", label, service }));

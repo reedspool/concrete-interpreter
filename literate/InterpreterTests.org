@@ -59,7 +59,7 @@ it("Multiple blocks without a comma separating them produces only the latter as 
 });
 #+end_src
 
-* Executors
+* Add Executor
     
 #+begin_src js
 it("Simplest add executor", async () => {
@@ -83,4 +83,63 @@ it("Add executor works on strings too", async () => {
     const [ result ] = await interpretFile(input);
     expect(result).toEqual("Hello World!");
 });
+#+end_src
+
+#+begin_src js
+it("Add executor works on numbers and strings, the same way JS does", async () => {
+    const input = "\"Hello \", 250, \"th World!\" add! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual("Hello " + 250 + "th World!");
+});
+#+end_src
+
+* Multiply Executor
+
+#+begin_src js
+it("Simplest multiply executor", async () => {
+    const input = "0 multiply! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(0);
+});
+#+end_src
+
+#+begin_src js
+it("Simple multiply executor", async () => {
+    const input = "1, 2, 3, 4 multiply! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(24);
+});
+#+end_src
+
+#+begin_src js
+it("Multiply executor turns Strings to NaNs", async () => {
+    const input = "\"Hello \", \"World!\" multiply! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBeNaN();
+});
+#+end_src
+
+#+begin_src js
+it("Multiply expects at least one argument", async () => {
+    const input = "multiply! _";
+    expect(interpretFile(input)).rejects.toHaveProperty("error");
+});
+#+end_src
+
+* Basic labels
+
+#+begin_src js
+it("Simple labeled block as result", async () => {
+    const input = "abcd: 5 abcd";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+#+end_src
+
+#+begin_src js
+it("Labeled block points to another labeled block as result", async () => {
+    const input = "abcd: efgh, efgh: 5 abcd";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
 #+end_src

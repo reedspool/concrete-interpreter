@@ -112,6 +112,8 @@ Ops act on their arguments, or the tape around them. They are the blocks which /
                         src : "dispatchOnExecutor",
                         data : (C, E) => C,
                         onError : {
+                            // Toggle on for executor error loggging
+                            // actions: [(C, E) => console.log("Executor Error:", E)],
                             target : "#StepwiseInterpreter.error"
                         },
                         onDone: {
@@ -178,21 +180,27 @@ Closing "run" internal states map as well as itself.
 
 A program which has completed interpretation normally will find itself, finally, in the "halted" state
 
+When the program is halted, the result of the program is the current arguments list in the active frame.
+
 #+begin_src js
         halted: {
             type : "final",
             entry : [ "haltFrame" ],
-            data : (C) => C
+            data : (C) => ({ results: C.activeFrame.arguments })
         },
 #+end_src
 
 The other way a program can end is in the error state.
 
+When the program errors, we assume it is from an executor, in which case the current event holds all the data about the error which arose.
+
+We include the full context of the machine for debugging purposes.
+
 #+begin_src js
         error: {
             type : "final",
             entry : [ "haltFrame" ],
-            data : (C) => C
+            data : (C, E) => ({ error: E, context: C })
         },
 #+end_src
 
@@ -248,13 +256,15 @@ Determine what is the category of the block at the head of the current cell.
 
 Depending on the circumstances, we do or do not clear the current argument list before adding the current block. See "executeValue" above.
 
+Either way, if the value is a ValueIdentifier, we have to resolve it to its proper value, but the =Frame= implementation will handle that.
+
 #+begin_src js
         appendArgumentsWithCurrentBlock : assign((C, E) => {
-            C.activeFrame.appendBlockToArguments(C.currentBlock);
+            C.activeFrame.appendBlockAtHeadValueToArguments();
         }),
         replaceArgumentsWithCurrentBlock : assign((C, E) => {
             C.activeFrame.clearArguments();
-            C.activeFrame.appendBlockToArguments(C.currentBlock);
+            C.activeFrame.appendBlockAtHeadValueToArguments();
         }),
 #+end_src
 
@@ -332,7 +342,15 @@ Before returning, invoke the service creator with the current context. Because w
 #+begin_src js
     },
     services: {
-        dispatchOnExecutor : (C, E) => C.globalLabelsToExecutorServices[C.currentBlock.identifier](C)
+        dispatchOnExecutor : (C, E) => {
+            const identifier = C.currentBlock.identifier
+            const executor = 
+                  C.globalLabelsToExecutorServices[identifier];
+
+            if (! executor) throw new Error(`No executor found for identifier "${identifier}"`);
+
+            return executor(C);
+        }
 #+end_src
 
 Close final config map.

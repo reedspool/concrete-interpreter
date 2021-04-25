@@ -1,13 +1,13 @@
 #+TITLE: Stack Frame
 #+PROPERTY: header-args    :comments both :tangle ../src/Frame.js
 
-Factory because I hate =new= keyword.
-
 #+begin_src js
-export const Frame = (...args) => new _Frame(...args);
+import { Category } from "concrete-parser";
 #+end_src
 
 #+begin_src js
+export const Frame = (...args) => new _Frame(...args);
+
 class _Frame {
     constructor (tree) {
         this.tree = tree;
@@ -20,9 +20,9 @@ class _Frame {
     isBeyondEdge() { return this.head >= this.length; }
 
     advance() { this.head++; }
-    
+
     halt() { this.halted = true; }
-    
+
     getBlockAtHead() { return this.tree.tape.cells[this.head]; }
 
     isCommaAtHead() { return this.tree.tape.commas[this.head]; }
@@ -32,5 +32,19 @@ class _Frame {
     clearArguments() { this.arguments = []; }
     
     appendBlockToArguments(block) { this.arguments.push(block); }
+#+end_src
+
+Arguments list can never include ValueIdentifiers, so always resolve them to their true value.
+
+#+begin_src js
+    appendBlockAtHeadValueToArguments() {
+        let block = this.getBlockAtHead();
+
+        while (block.is(Category.Value, "ValueIdentifier")) {
+            block = this.tree.tape.getBlockAtLabel(block.identifier);
+        }
+
+        this.appendBlockToArguments(block);
+    }
 }
 #+end_src

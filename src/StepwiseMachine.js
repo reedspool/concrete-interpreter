@@ -127,6 +127,8 @@ export const definition = {
                         src : "dispatchOnExecutor",
                         data : (C, E) => C,
                         onError : {
+                            // Toggle on for executor error loggging
+                            // actions: [(C, E) => console.log("Executor Error:", E)],
                             target : "#StepwiseInterpreter.error"
                         },
                         onDone: {
@@ -207,12 +209,14 @@ export const definition = {
 
 // A program which has completed interpretation normally will find itself, finally, in the "halted" state
 
+// When the program is halted, the result of the program is the current arguments list in the active frame.
+
 
 // [[file:../literate/StepwiseMachine.org::*Definition][Definition:12]]
         halted: {
             type : "final",
             entry : [ "haltFrame" ],
-            data : (C) => C
+            data : (C) => ({ results: C.activeFrame.arguments })
         },
 // Definition:12 ends here
 
@@ -220,12 +224,16 @@ export const definition = {
 
 // The other way a program can end is in the error state.
 
+// When the program errors, we assume it is from an executor, in which case the current event holds all the data about the error which arose.
+
+// We include the full context of the machine for debugging purposes.
+
 
 // [[file:../literate/StepwiseMachine.org::*Definition][Definition:13]]
         error: {
             type : "final",
             entry : [ "haltFrame" ],
-            data : (C) => C
+            data : (C, E) => ({ error: E, context: C })
         },
 // Definition:13 ends here
 
@@ -299,14 +307,16 @@ export const config = {
 
 // Depending on the circumstances, we do or do not clear the current argument list before adding the current block. See "executeValue" above.
 
+// Either way, if the value is a ValueIdentifier, we have to resolve it to its proper value, but the =Frame= implementation will handle that.
+
 
 // [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:5]]
         appendArgumentsWithCurrentBlock : assign((C, E) => {
-            C.activeFrame.appendBlockToArguments(C.currentBlock);
+            C.activeFrame.appendBlockAtHeadValueToArguments();
         }),
         replaceArgumentsWithCurrentBlock : assign((C, E) => {
             C.activeFrame.clearArguments();
-            C.activeFrame.appendBlockToArguments(C.currentBlock);
+            C.activeFrame.appendBlockAtHeadValueToArguments();
         }),
 // Configuration:5 ends here
 
@@ -411,7 +421,15 @@ export const config = {
 // [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:15]]
     },
     services: {
-        dispatchOnExecutor : (C, E) => C.globalLabelsToExecutorServices[C.currentBlock.identifier](C)
+        dispatchOnExecutor : (C, E) => {
+            const identifier = C.currentBlock.identifier
+            const executor = 
+                  C.globalLabelsToExecutorServices[identifier];
+
+            if (! executor) throw new Error(`No executor found for identifier "${identifier}"`);
+
+            return executor(C);
+        }
 // Configuration:15 ends here
 
 

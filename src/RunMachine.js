@@ -30,8 +30,7 @@ export const definition = {
     states : {
         done: {
             type: "final",
-            // TODO move this into stepwise
-            data: (C, E) => E?.data?.activeFrame?.arguments
+            data: (C, E) => E.data
         },
 // Definition:2 ends here
 
