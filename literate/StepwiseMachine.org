@@ -22,13 +22,30 @@ export const definition = {
     strict: true,
 #+end_src
 
-The interpreter will always start in the "empty" state, because it doesn't have any code to run. It will proceed if it receives some code to run.
+At any time until the interpreter finalizes, users can load new global implementations.
+
+#+begin_src js
+    on: {
+        LOAD_GLOBAL_LABEL: { actions: [ "loadGlobalLabel" ] }
+    },
+#+end_src
+
+Initialize key structures in machine context immediately upon creation.
+
+#+begin_src js
+    initial: "uninitialized",
+    states: {
+        uninitialized: {
+            entry: [ "initialize" ],
+            always: "empty"
+        },
+#+end_src
+
+After initializing, the interpreter will always start in the "empty" state, because it doesn't have any code to run. It will proceed if it receives some code to run.
 
 The "states" object is left open, because there are many more to define.
 
 #+begin_src js
-    initial: "empty",
-    states: {
         empty: {
             on: {
                 LOAD_PROGRAM: {
@@ -86,10 +103,33 @@ Upon proceeding, we branch depending on the category of that block.
                 },
 #+end_src
 
-TODO
+Ops act on their arguments, or the tape around them. They are the blocks which /do/ things. What happens depends on the block itself, so we have to dispatch based on that block to a variety of executors.
 
 #+begin_src js
-                executeOp: {},
+                executeOp: {
+                    invoke: {
+                        id : "executor",
+                        src : "dispatchOnExecutor",
+                        data : (C, E) => C,
+                        onError : {
+                            target : "#StepwiseInterpreter.error"
+                        },
+                        onDone: {
+                            target: "advance"
+                        }
+                    },
+#+end_src
+
+Op executors can do a huge variety of things during their invocation. All those things are received as events, and handled by this machine.
+
+This first important action is a way to replicate the "onDone" above for those services which do not finalize themselves, like callback services.
+
+#+begin_src js
+                    on: {
+                        DONE: { target: "advance" },
+                        PLACE_OP_RESULT : { actions: [ "exec_placeResult" ] }
+                    }
+                },
 #+end_src
 
 If there is a comma preceding the current block, we grow the argument list by appending the current block. If there is no comma, the argument list will only contain the current block, dumping its previous contents.
@@ -141,7 +181,7 @@ A program which has completed interpretation normally will find itself, finally,
 #+begin_src js
         halted: {
             type : "final",
-            entry : [ "haltFrame", "storeResult" ],
+            entry : [ "haltFrame" ],
             data : (C) => C
         },
 #+end_src
@@ -151,7 +191,7 @@ The other way a program can end is in the error state.
 #+begin_src js
         error: {
             type : "final",
-            entry : [ "haltFrame", "storeResult" ],
+            entry : [ "haltFrame" ],
             data : (C) => C
         },
 #+end_src
@@ -176,6 +216,14 @@ Start with actions.
 #+begin_src js
 export const config = {
     actions: {
+#+end_src
+
+When the machine starts, its context just an empty object. Fill it with some necessary structures.
+
+#+begin_src js
+        initialize : assign((C, E) => {
+            C.globalLabelsToExecutorServices = {};
+        }),
 #+end_src
 
 When the program loads, the source is an Abstract Syntax Tree. We need to create an active stack frame for it.
@@ -226,13 +274,6 @@ When the program ends or the current tape ends, we set the frame to halted.
         }),
 #+end_src
 
-When the program ends or the current tape ends, put the result in an easy-to-grab place.
-
-#+begin_src js
-        storeResult : assign((C, E) => {
-        }),
-#+end_src
-
 When the interpreter encounters a run-time error, that is not an exception in the JavaScript run-time. Save an error object without throwing it.
 
 #+begin_src js
@@ -246,6 +287,20 @@ Let our parent know when they can safely send a "STEP" event. When our parent wa
 #+begin_src js
         reportReadyToStep : sendParent((C, E) => {
             return { type: "READY_TO_STEP" };
+        }),
+#+end_src
+
+#+begin_src js
+        loadGlobalLabel: assign((C, E) => {
+            C.globalLabelsToExecutorServices[E.label] = E.service;
+        }),
+#+end_src
+
+There are a huge number of actions that op block executors can take in the course of their invocation. They are all prefixed with `exec_`.
+
+#+begin_src js
+        exec_placeResult: assign((C, E) => {
+            C.activeFrame.placeResult(E.block);
         }),
 #+end_src
 
@@ -270,7 +325,17 @@ We need to check the category of the current block in order to branch execution.
         isCurrentBlockOp : (C, E) => C.currentBlock.is(Category.Op),
 #+end_src
 
-Close final config maps.
+Given the current block, return the executor service that matches it.
+
+Before returning, invoke the service creator with the current context. Because we are using Immer, the service won't be able to edit anything about the context.
+
+#+begin_src js
+    },
+    services: {
+        dispatchOnExecutor : (C, E) => C.globalLabelsToExecutorServices[C.currentBlock.identifier](C)
+#+end_src
+
+Close final config map.
 
 #+begin_src js
     }

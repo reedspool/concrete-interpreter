@@ -10,6 +10,7 @@ import * as RunMachine from "./RunMachine";
 import { parseFile } from "concrete-parser";
 import { interpret } from "xstate";
 import { InvertedPromise as Promise } from "inverted-promise";
+import { service as addExecutorService } from "./executors/add";
 #+end_src
 
 * Interpret File
@@ -66,6 +67,16 @@ Before turning the interpreter on, send the program so it can prepare.
 
 #+begin_src js
     runInterpreter.send({ type: "LOAD_PROGRAM", source : tree });
+#+end_src
+
+Next, add all global values and executors.
+
+#+begin_src js
+    [
+        { label: "add", service: addExecutorService }
+    ].forEach(
+        ({ label, service }) => runInterpreter.send(
+            { type: "LOAD_GLOBAL_LABEL", label, service }));
 #+end_src
 
 Finally, switch the interpreter into gear by telling it to run.

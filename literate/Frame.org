@@ -27,6 +27,8 @@ class _Frame {
 
     isCommaAtHead() { return this.tree.tape.commas[this.head]; }
 
+    placeResult(block) { this.tree.tape.cells[this.head + 1] = block; }
+
     clearArguments() { this.arguments = []; }
     
     appendBlockToArguments(block) { this.arguments.push(block); }

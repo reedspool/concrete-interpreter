@@ -7,7 +7,7 @@
 import { interpretFile } from "../src/Interpreter";
 #+end_src
 
-* Tests
+* Simple
 
 Simple empty source should not have a result.
 
@@ -56,5 +56,31 @@ it("Multiple blocks without a comma separating them produces only the latter as 
     const input = "1 2";
     const result = await interpretFile(input);
     expect(result).toEqual([2]);
+});
+#+end_src
+
+* Executors
+    
+#+begin_src js
+it("Simplest add executor", async () => {
+    const input = "0 add! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(0);
+});
+#+end_src
+
+#+begin_src js
+it("Simple add executor", async () => {
+    const input = "1, 2, 3 add! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(6);
+});
+#+end_src
+
+#+begin_src js
+it("Add executor works on strings too", async () => {
+    const input = "\"Hello \", \"World!\" add! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual("Hello World!");
 });
 #+end_src

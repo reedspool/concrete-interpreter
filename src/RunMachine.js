@@ -101,6 +101,7 @@ export const definition = {
                     },
                     on : {
                         LOAD_PROGRAM : { actions: [ "forwardToStepwiseMachine" ] },
+                        LOAD_GLOBAL_LABEL: { actions: [ "forwardToStepwiseMachine" ] },
                         STEP : { actions: [ "forwardToStepwiseMachine" ] },
                         READY_TO_STEP : [
                             {

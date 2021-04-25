@@ -6,6 +6,7 @@ import * as RunMachine from "./RunMachine";
 import { parseFile } from "concrete-parser";
 import { interpret } from "xstate";
 import { InvertedPromise as Promise } from "inverted-promise";
+import { service as addExecutorService } from "./executors/add";
 // Preamble:1 ends here
 
 // Interpret File
@@ -82,19 +83,32 @@ export const interpretFile = async (source) => {
 
 
 
-// Finally, switch the interpreter into gear by telling it to run.
+// Next, add all global values and executors.
 
 
 // [[file:../literate/Interpreter.org::*Interpret File][Interpret File:7]]
-    runInterpreter.send("RUN");
+    [
+        { label: "add", service: addExecutorService }
+    ].forEach(
+        ({ label, service }) => runInterpreter.send(
+            { type: "LOAD_GLOBAL_LABEL", label, service }));
 // Interpret File:7 ends here
+
+
+
+// Finally, switch the interpreter into gear by telling it to run.
+
+
+// [[file:../literate/Interpreter.org::*Interpret File][Interpret File:8]]
+    runInterpreter.send("RUN");
+// Interpret File:8 ends here
 
 
 
 // Return the result promise and we're done.
 
 
-// [[file:../literate/Interpreter.org::*Interpret File][Interpret File:8]]
+// [[file:../literate/Interpreter.org::*Interpret File][Interpret File:9]]
     return result;
 };
-// Interpret File:8 ends here
+// Interpret File:9 ends here
