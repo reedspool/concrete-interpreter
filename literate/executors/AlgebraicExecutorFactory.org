@@ -1,0 +1,24 @@
+#+TITLE: Algebraic Executor Factory
+#+PROPERTY: header-args    :comments both :tangle ../../src/executors/AlgebraicExecutorFactory.js
+
+Lots of algebraic operators have the same form, only the operator changes. This file is a factory to simplify the creation of binary algebraic operator executors.
+
+Executors must be XState services and for this one we've chosen the callback type of service.
+
+#+begin_src js
+import { ValueBlock } from "concrete-parser";
+#+end_src
+
+#+begin_src js
+export const create = (fnBinaryOp, fnJSToBlock = (n) => n) => (C) => (sendParent, receiveParent) => {
+    const [ first, ...rest ] = C.activeFrame.arguments;
+    const result = rest.reduce(
+        (memo, block) => fnBinaryOp(memo, block.asJS()), first.asJS());
+    const block = ValueBlock.fromJS(fnJSToBlock(result));
+    sendParent({ type: "PLACE_OP_RESULT", block });
+    sendParent("DONE");
+};
+#+end_src
+
+
+

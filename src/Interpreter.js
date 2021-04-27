@@ -6,8 +6,12 @@ import * as RunMachine from "./RunMachine";
 import { parseFile } from "concrete-parser";
 import { interpret } from "xstate";
 import { InvertedPromise as Promise } from "inverted-promise";
-import { service as addExecutorService } from "./executors/add";
-import { service as multiplyExecutorService } from "./executors/multiply";
+import { create as createExecutor } from "./executors/AlgebraicExecutorFactory";
+import { service as getExecutorService } from "./executors/get";
+import { service as setExecutorService } from "./executors/set";
+import { service as jumpExecutorService } from "./executors/jump";
+import { service as callExecutorService } from "./executors/call";
+import { service as explicitReturnExecutorService } from "./executors/explicitReturn";
 // Preamble:1 ends here
 
 // Interpret File
@@ -92,28 +96,56 @@ export const interpretFile = async (source) => {
 
 // [[file:../literate/Interpreter.org::*Interpret File][Interpret File:7]]
     [
-        { label: "add", service: addExecutorService },
-        { label: "multiply", service: multiplyExecutorService }
+        { label: "get", service: getExecutorService },
+        { label: "set", service: setExecutorService },
+        { label: "jump", service: jumpExecutorService },
+        { label: "call", service: callExecutorService },
+        { label: "return", service: explicitReturnExecutorService },
+// Interpret File:7 ends here
+
+
+
+// A lot of binary, algebraic operators in JS are very similar in their construction, so create them by factory instead of in their own files.
+
+
+// [[file:../literate/Interpreter.org::*Interpret File][Interpret File:8]]
+        { label: "add", service: createExecutor((a, b) => a + b) },
+        { label: "subtract", service: createExecutor((a, b) => a - b) },
+        { label: "multiply", service: createExecutor((a, b) => a * b) },
+        { label: "divide", service: createExecutor((a, b) => a / b) },
+// Interpret File:8 ends here
+
+
+
+// Zero is the only false-y value in Concrete. There are no proper boolean values (yet). For all operators which return booleans, convert them to either a 1 or 0.
+
+
+// [[file:../literate/Interpreter.org::*Interpret File][Interpret File:9]]
+        { label: "equal", service: createExecutor((a, b) => a === b, (n) => n ? 1 : 0) },
+        { label: "and", service: createExecutor((a, b) => a && b, (n) => n ? 1 : 0) },
+        { label: "or", service: createExecutor((a, b) => a || b, (n) => n ? 1 : 0) },
+        { label: "lessThan", service: createExecutor((a, b) => a < b, (n) => n ? 1 : 0) },
+        { label: "greaterThan", service: createExecutor((a, b) => a > b, (n) => n ? 1 : 0) },
     ].forEach(
         ({ label, service }) => runInterpreter.send(
             { type: "LOAD_GLOBAL_LABEL", label, service }));
-// Interpret File:7 ends here
+// Interpret File:9 ends here
 
 
 
 // Finally, switch the interpreter into gear by telling it to run.
 
 
-// [[file:../literate/Interpreter.org::*Interpret File][Interpret File:8]]
+// [[file:../literate/Interpreter.org::*Interpret File][Interpret File:10]]
     runInterpreter.send("RUN");
-// Interpret File:8 ends here
+// Interpret File:10 ends here
 
 
 
 // Return the result promise and we're done.
 
 
-// [[file:../literate/Interpreter.org::*Interpret File][Interpret File:9]]
+// [[file:../literate/Interpreter.org::*Interpret File][Interpret File:11]]
     return result;
 };
-// Interpret File:9 ends here
+// Interpret File:11 ends here

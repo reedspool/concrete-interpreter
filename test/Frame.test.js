@@ -12,9 +12,9 @@ import { parseFile, Category } from "concrete-parser";
 // [[file:../literate/FrameTest.org::*Tests][Tests:1]]
 it("Can be instantiated", async () => {
     const tree = await parseFile("1 2 3");
-    const frame = Frame(tree);
+    const frame = Frame(tree.tape);
     expect(frame).toBeDefined();
-    expect(frame.tree).toBeDefined();
+    expect(frame.tape).toBeDefined();
     expect(frame.length).toBe(3);
     expect(frame.head).toBe(0);
     expect(frame.halted).toBe(false);
@@ -26,7 +26,7 @@ it("Can be instantiated", async () => {
 // [[file:../literate/FrameTest.org::*Tests][Tests:2]]
 it("Advance until isBeyondEdge", async () => {
     const tree = await parseFile("1 2 3");
-    const frame = Frame(tree);
+    const frame = Frame(tree.tape);
     expect(frame.head).toBe(0);
     expect(frame.isBeyondEdge()).toBe(false);
     frame.advance();
@@ -42,7 +42,7 @@ it("Advance until isBeyondEdge", async () => {
 it("Can work with commas with argument lists", async () => {
     // Simulate what the interpreter would do with argument lists
     const tree = await parseFile("1, 2 3");
-    const frame = Frame(tree);
+    const frame = Frame(tree.tape);
     expect(frame.isCommaAtHead()).toBeFalsy();
     frame.appendBlockToArguments(frame.getBlockAtHead());
     

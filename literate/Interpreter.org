@@ -10,8 +10,12 @@ import * as RunMachine from "./RunMachine";
 import { parseFile } from "concrete-parser";
 import { interpret } from "xstate";
 import { InvertedPromise as Promise } from "inverted-promise";
-import { service as addExecutorService } from "./executors/add";
-import { service as multiplyExecutorService } from "./executors/multiply";
+import { create as createExecutor } from "./executors/AlgebraicExecutorFactory";
+import { service as getExecutorService } from "./executors/get";
+import { service as setExecutorService } from "./executors/set";
+import { service as jumpExecutorService } from "./executors/jump";
+import { service as callExecutorService } from "./executors/call";
+import { service as explicitReturnExecutorService } from "./executors/explicitReturn";
 #+end_src
 
 * Interpret File
@@ -77,8 +81,30 @@ Next, add all global values and executors.
 
 #+begin_src js
     [
-        { label: "add", service: addExecutorService },
-        { label: "multiply", service: multiplyExecutorService }
+        { label: "get", service: getExecutorService },
+        { label: "set", service: setExecutorService },
+        { label: "jump", service: jumpExecutorService },
+        { label: "call", service: callExecutorService },
+        { label: "return", service: explicitReturnExecutorService },
+#+end_src
+
+A lot of binary, algebraic operators in JS are very similar in their construction, so create them by factory instead of in their own files.
+
+#+begin_src js
+        { label: "add", service: createExecutor((a, b) => a + b) },
+        { label: "subtract", service: createExecutor((a, b) => a - b) },
+        { label: "multiply", service: createExecutor((a, b) => a * b) },
+        { label: "divide", service: createExecutor((a, b) => a / b) },
+#+end_src
+
+Zero is the only false-y value in Concrete. There are no proper boolean values (yet). For all operators which return booleans, convert them to either a 1 or 0.
+
+#+begin_src js
+        { label: "equal", service: createExecutor((a, b) => a === b, (n) => n ? 1 : 0) },
+        { label: "and", service: createExecutor((a, b) => a && b, (n) => n ? 1 : 0) },
+        { label: "or", service: createExecutor((a, b) => a || b, (n) => n ? 1 : 0) },
+        { label: "lessThan", service: createExecutor((a, b) => a < b, (n) => n ? 1 : 0) },
+        { label: "greaterThan", service: createExecutor((a, b) => a > b, (n) => n ? 1 : 0) },
     ].forEach(
         ({ label, service }) => runInterpreter.send(
             { type: "LOAD_GLOBAL_LABEL", label, service }));

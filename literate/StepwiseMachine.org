@@ -6,10 +6,11 @@ This XState Machine will interpret Concrete programs in a step-wise fashion, tha
 * Preamble
 
 #+begin_src js
-import { Machine, sendParent } from "xstate";
+import { Machine, sendParent, send } from "xstate";
 import { assign } from "@xstate/immer";
 import { Frame } from "./Frame";
 import { Category } from "concrete-parser";
+const MAX_STEPS = 100;
 #+end_src
 
 * Definition
@@ -58,19 +59,32 @@ The "states" object is left open, because there are many more to define.
 
 Once the program is loaded, we are going to be inside "run" until the program finishes or crashes.
 
-The "run" state is complex. It always starts in the sub-state where it checks if the reader head is beyond the edge. This is important because the loaded program might be empty, in which case it should immediately halt. Otherwise, we proceed to the normal "read" phase.
+The "run" state is complex. It always starts in the sub-state where it checks if the reader head is beyond the edge. This is important because the loaded program might be empty, in which case it should immediately halt.
+
+If the tape is past the edge, then the current tape halts. This tape might have been called by another, indicated by the stack not being empty. Then, this is an implicit return.
+
+If the tape is past the edge but the stack is empty, then the entire program is done.
+
+Otherwise, we proceed to the normal "read" phase.
 
 #+begin_src js
         run: {
             initial: "checkPastTapeEdge",
             states: {
                 checkPastTapeEdge: {
+                    entry: [ assign((C, E) => { C.steps += 1; if (C.steps > MAX_STEPS) throw new Error("max steps") })],
                     always: [
+                        {
+                            cond: "isBeyondEdgeAndStackIsNonEmpty",
+                            target: "return"
+                        },
                         {
                             cond: "isBeyondEdge",
                             target: "#StepwiseInterpreter.halted"
                         },
-                        "read"
+                        {
+                            target: "read"
+                        }
                     ]
                 },
 #+end_src
@@ -110,14 +124,15 @@ Ops act on their arguments, or the tape around them. They are the blocks which /
                     invoke: {
                         id : "executor",
                         src : "dispatchOnExecutor",
-                        data : (C, E) => C,
+                        // data : (C, E) => C,
                         onError : {
                             // Toggle on for executor error loggging
                             // actions: [(C, E) => console.log("Executor Error:", E)],
                             target : "#StepwiseInterpreter.error"
                         },
                         onDone: {
-                            target: "advance"
+                            target: "advance",
+                            actions: [ "clearArguments" ]
                         }
                     },
 #+end_src
@@ -128,8 +143,15 @@ This first important action is a way to replicate the "onDone" above for those s
 
 #+begin_src js
                     on: {
-                        DONE: { target: "advance" },
-                        PLACE_OP_RESULT : { actions: [ "exec_placeResult" ] }
+                        DONE: { target: "advance", actions: [ "clearArguments" ] },
+                        DONE_NO_ADVANCE: { target: "no_advance" },
+                        EXPLICIT_RETURN: { target: "return" },
+                        CLEAR_ARGUMENTS: { actions: [ "clearArguments" ] },
+                        CALL_TAPE : { actions: [ "exec_callTape" ] },
+                        PLACE_OP_RESULT : { actions: [ "exec_placeResult" ] },
+                        PLACE_BLOCK_AT_ADDRESS : { actions: [ "exec_placeBlockAtAddress" ] },
+                        MOVE_HEAD_TO_ADDRESS : { actions: [ "exec_moveHeadToAddress" ]},
+                        REQUEST_BLOCK_AT_ADDRESS : { actions: [ "exec_reqBlockAtAddress" ] },
                     }
                 },
 #+end_src
@@ -169,6 +191,47 @@ After advancing, we go "back to the top" in the read-eval-advance cycle, first c
                         }
                     }
                 },
+#+end_src
+
+For those executors which do not advance the head, we still want the step machine to act the same way, so make the same exact state but which does not advance.
+
+#+begin_src js
+                no_advance: {
+                    entry: [ "reportReadyToStep" ],
+                    on : {
+                        STEP: {
+                            target: "checkPastTapeEdge",
+                        }
+                    }
+                },
+#+end_src
+
+The machine enters the "return" state when a called tape is complete. If the tape has a result, place it where results go. Usually, this is immediately to the right of the call identifier which spawned the tape.
+
+#+begin_src js
+                "return" : {
+                    entry: [ "reportReadyToStep" ],
+                    on : {
+                        STEP: {
+                            target: "pop",
+                            actions: [ "placeResultOnLowerFrame" ]
+                        }
+                    }
+                },
+#+end_src
+
+Pop merely disposes of the current frame and replaces it with the frame on top of the stack. Then, it starts back at the top of the loop by checking past the edge for the old frame.
+
+#+begin_src js
+                pop : {
+                    entry: [ "reportReadyToStep" ],
+                    on : {
+                        STEP: {
+                            target: "advance",
+                            actions: [ "popFrame" ]
+                        }
+                    }
+                }
 #+end_src
 
 Closing "run" internal states map as well as itself.
@@ -230,6 +293,7 @@ When the machine starts, its context just an empty object. Fill it with some nec
 
 #+begin_src js
         initialize : assign((C, E) => {
+            C.steps = 0;
             C.globalLabelsToExecutorServices = {};
         }),
 #+end_src
@@ -241,7 +305,7 @@ The rest of the stack is empty.
 #+begin_src js
         loadProgram: assign((C, E) => {
             C.source = E.source;
-            C.activeFrame = Frame(C.source);
+            C.activeFrame = Frame(E.source.tape);
             C.stack = [];
         }),
 #+end_src
@@ -259,6 +323,9 @@ Depending on the circumstances, we do or do not clear the current argument list 
 Either way, if the value is a ValueIdentifier, we have to resolve it to its proper value, but the =Frame= implementation will handle that.
 
 #+begin_src js
+        clearArguments: assign((C, E) => {
+            C.activeFrame.clearArguments();
+        }),
         appendArgumentsWithCurrentBlock : assign((C, E) => {
             C.activeFrame.appendBlockAtHeadValueToArguments();
         }),
@@ -306,11 +373,48 @@ Let our parent know when they can safely send a "STEP" event. When our parent wa
         }),
 #+end_src
 
+Pop the stack, disposing of the current frame and replacing it with the top of the stack.
+
+#+begin_src js
+        popFrame : assign((C, E) => {
+            C.activeFrame = C.stack.pop();
+        }),
+#+end_src
+
+Place the result of the current frame on the frame below it. The result of the current frame is just the current arguments list.
+
+For now, we are just placing the /first/ of that argument list. Perhaps in the future, multiple values of that argument list will match to a number of blanks, or multiple values will result in a tape of values.
+
+If the arguments list is empty, do nothing.
+
+#+begin_src js
+        placeResultOnLowerFrame : assign((C, E) => {
+            const [ result ] = C.activeFrame.arguments;
+            if (! result) return;
+            const lastFrame = C.stack[C.stack.length - 1];
+            lastFrame.placeResult(result);
+        }),
+#+end_src
+
 There are a huge number of actions that op block executors can take in the course of their invocation. They are all prefixed with `exec_`.
 
 #+begin_src js
+        exec_callTape: assign((C, E) => {
+            C.stack.push(C.activeFrame);
+            C.activeFrame = Frame(E.tape)
+        }),
         exec_placeResult: assign((C, E) => {
             C.activeFrame.placeResult(E.block);
+        }),
+        exec_reqBlockAtAddress : send((C, E) => {
+            const block = C.activeFrame.getBlockAtLabel(E.address.identifier);
+            return { type : "RESPONSE_EXECUTOR", block };
+        }, { to: "executor" }),
+        exec_placeBlockAtAddress : assign((C, E) => {
+            C.activeFrame.setBlockAtLabel(E.address.identifier, E.block);
+        }),
+        exec_moveHeadToAddress : assign((C, E) => {
+            C.activeFrame.moveHeadToLabel(E.address.identifier);
         }),
 #+end_src
 
@@ -325,6 +429,7 @@ Many guards are obvious from the perspective of the machine, we just defer them 
 
 #+begin_src js
         isBeyondEdge : (C, E) => C.activeFrame.isBeyondEdge(),
+        isBeyondEdgeAndStackIsNonEmpty : (C, E) => C.activeFrame.isBeyondEdge() && C.stack.length > 0,
         isCommaAtHead : (C, E) => C.activeFrame.isCommaAtHead(),
 #+end_src
 
@@ -359,7 +464,6 @@ Close final config map.
     }
 }
 #+end_src
-
 * Initialize
 
 Start with an empty context.

@@ -2,10 +2,11 @@
 
 
 // [[file:../literate/StepwiseMachine.org::*Preamble][Preamble:1]]
-import { Machine, sendParent } from "xstate";
+import { Machine, sendParent, send } from "xstate";
 import { assign } from "@xstate/immer";
 import { Frame } from "./Frame";
 import { Category } from "concrete-parser";
+const MAX_STEPS = 100;
 // Preamble:1 ends here
 
 // Definition
@@ -66,7 +67,13 @@ export const definition = {
 
 // Once the program is loaded, we are going to be inside "run" until the program finishes or crashes.
 
-// The "run" state is complex. It always starts in the sub-state where it checks if the reader head is beyond the edge. This is important because the loaded program might be empty, in which case it should immediately halt. Otherwise, we proceed to the normal "read" phase.
+// The "run" state is complex. It always starts in the sub-state where it checks if the reader head is beyond the edge. This is important because the loaded program might be empty, in which case it should immediately halt.
+
+// If the tape is past the edge, then the current tape halts. This tape might have been called by another, indicated by the stack not being empty. Then, this is an implicit return.
+
+// If the tape is past the edge but the stack is empty, then the entire program is done.
+
+// Otherwise, we proceed to the normal "read" phase.
 
 
 // [[file:../literate/StepwiseMachine.org::*Definition][Definition:5]]
@@ -74,12 +81,19 @@ export const definition = {
             initial: "checkPastTapeEdge",
             states: {
                 checkPastTapeEdge: {
+                    entry: [ assign((C, E) => { C.steps += 1; if (C.steps > MAX_STEPS) throw new Error("max steps") })],
                     always: [
+                        {
+                            cond: "isBeyondEdgeAndStackIsNonEmpty",
+                            target: "return"
+                        },
                         {
                             cond: "isBeyondEdge",
                             target: "#StepwiseInterpreter.halted"
                         },
-                        "read"
+                        {
+                            target: "read"
+                        }
                     ]
                 },
 // Definition:5 ends here
@@ -125,14 +139,15 @@ export const definition = {
                     invoke: {
                         id : "executor",
                         src : "dispatchOnExecutor",
-                        data : (C, E) => C,
+                        // data : (C, E) => C,
                         onError : {
                             // Toggle on for executor error loggging
                             // actions: [(C, E) => console.log("Executor Error:", E)],
                             target : "#StepwiseInterpreter.error"
                         },
                         onDone: {
-                            target: "advance"
+                            target: "advance",
+                            actions: [ "clearArguments" ]
                         }
                     },
 // Definition:7 ends here
@@ -146,8 +161,15 @@ export const definition = {
 
 // [[file:../literate/StepwiseMachine.org::*Definition][Definition:8]]
                     on: {
-                        DONE: { target: "advance" },
-                        PLACE_OP_RESULT : { actions: [ "exec_placeResult" ] }
+                        DONE: { target: "advance", actions: [ "clearArguments" ] },
+                        DONE_NO_ADVANCE: { target: "no_advance" },
+                        EXPLICIT_RETURN: { target: "return" },
+                        CLEAR_ARGUMENTS: { actions: [ "clearArguments" ] },
+                        CALL_TAPE : { actions: [ "exec_callTape" ] },
+                        PLACE_OP_RESULT : { actions: [ "exec_placeResult" ] },
+                        PLACE_BLOCK_AT_ADDRESS : { actions: [ "exec_placeBlockAtAddress" ] },
+                        MOVE_HEAD_TO_ADDRESS : { actions: [ "exec_moveHeadToAddress" ]},
+                        REQUEST_BLOCK_AT_ADDRESS : { actions: [ "exec_reqBlockAtAddress" ] },
                     }
                 },
 // Definition:8 ends here
@@ -197,13 +219,63 @@ export const definition = {
 
 
 
-// Closing "run" internal states map as well as itself.
+// For those executors which do not advance the head, we still want the step machine to act the same way, so make the same exact state but which does not advance.
 
 
 // [[file:../literate/StepwiseMachine.org::*Definition][Definition:11]]
+                no_advance: {
+                    entry: [ "reportReadyToStep" ],
+                    on : {
+                        STEP: {
+                            target: "checkPastTapeEdge",
+                        }
+                    }
+                },
+// Definition:11 ends here
+
+
+
+// The machine enters the "return" state when a called tape is complete. If the tape has a result, place it where results go. Usually, this is immediately to the right of the call identifier which spawned the tape.
+
+
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:12]]
+                "return" : {
+                    entry: [ "reportReadyToStep" ],
+                    on : {
+                        STEP: {
+                            target: "pop",
+                            actions: [ "placeResultOnLowerFrame" ]
+                        }
+                    }
+                },
+// Definition:12 ends here
+
+
+
+// Pop merely disposes of the current frame and replaces it with the frame on top of the stack. Then, it starts back at the top of the loop by checking past the edge for the old frame.
+
+
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:13]]
+                pop : {
+                    entry: [ "reportReadyToStep" ],
+                    on : {
+                        STEP: {
+                            target: "advance",
+                            actions: [ "popFrame" ]
+                        }
+                    }
+                }
+// Definition:13 ends here
+
+
+
+// Closing "run" internal states map as well as itself.
+
+
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:14]]
             }
         },
-// Definition:11 ends here
+// Definition:14 ends here
 
 
 
@@ -212,13 +284,13 @@ export const definition = {
 // When the program is halted, the result of the program is the current arguments list in the active frame.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:12]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:15]]
         halted: {
             type : "final",
             entry : [ "haltFrame" ],
             data : (C) => ({ results: C.activeFrame.arguments })
         },
-// Definition:12 ends here
+// Definition:15 ends here
 
 
 
@@ -229,22 +301,22 @@ export const definition = {
 // We include the full context of the machine for debugging purposes.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:13]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:16]]
         error: {
             type : "final",
             entry : [ "haltFrame" ],
             data : (C, E) => ({ error: E, context: C })
         },
-// Definition:13 ends here
+// Definition:16 ends here
 
 
 
 // We're done with states, so close the state map:
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:14]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:17]]
     },
-// Definition:14 ends here
+// Definition:17 ends here
 
 
 
@@ -252,9 +324,9 @@ export const definition = {
 // And finally, close up the definition:
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:15]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:18]]
 };
-// Definition:15 ends here
+// Definition:18 ends here
 
 // Configuration
 
@@ -273,6 +345,7 @@ export const config = {
 
 // [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:2]]
         initialize : assign((C, E) => {
+            C.steps = 0;
             C.globalLabelsToExecutorServices = {};
         }),
 // Configuration:2 ends here
@@ -287,7 +360,7 @@ export const config = {
 // [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:3]]
         loadProgram: assign((C, E) => {
             C.source = E.source;
-            C.activeFrame = Frame(C.source);
+            C.activeFrame = Frame(E.source.tape);
             C.stack = [];
         }),
 // Configuration:3 ends here
@@ -311,6 +384,9 @@ export const config = {
 
 
 // [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:5]]
+        clearArguments: assign((C, E) => {
+            C.activeFrame.clearArguments();
+        }),
         appendArgumentsWithCurrentBlock : assign((C, E) => {
             C.activeFrame.appendBlockAtHeadValueToArguments();
         }),
@@ -372,44 +448,88 @@ export const config = {
 
 
 
-// There are a huge number of actions that op block executors can take in the course of their invocation. They are all prefixed with `exec_`.
+// Pop the stack, disposing of the current frame and replacing it with the top of the stack.
 
 
 // [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:11]]
+        popFrame : assign((C, E) => {
+            C.activeFrame = C.stack.pop();
+        }),
+// Configuration:11 ends here
+
+
+
+// Place the result of the current frame on the frame below it. The result of the current frame is just the current arguments list.
+
+// For now, we are just placing the /first/ of that argument list. Perhaps in the future, multiple values of that argument list will match to a number of blanks, or multiple values will result in a tape of values.
+
+// If the arguments list is empty, do nothing.
+
+
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:12]]
+        placeResultOnLowerFrame : assign((C, E) => {
+            const [ result ] = C.activeFrame.arguments;
+            if (! result) return;
+            const lastFrame = C.stack[C.stack.length - 1];
+            lastFrame.placeResult(result);
+        }),
+// Configuration:12 ends here
+
+
+
+// There are a huge number of actions that op block executors can take in the course of their invocation. They are all prefixed with `exec_`.
+
+
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:13]]
+        exec_callTape: assign((C, E) => {
+            C.stack.push(C.activeFrame);
+            C.activeFrame = Frame(E.tape)
+        }),
         exec_placeResult: assign((C, E) => {
             C.activeFrame.placeResult(E.block);
         }),
-// Configuration:11 ends here
+        exec_reqBlockAtAddress : send((C, E) => {
+            const block = C.activeFrame.getBlockAtLabel(E.address.identifier);
+            return { type : "RESPONSE_EXECUTOR", block };
+        }, { to: "executor" }),
+        exec_placeBlockAtAddress : assign((C, E) => {
+            C.activeFrame.setBlockAtLabel(E.address.identifier, E.block);
+        }),
+        exec_moveHeadToAddress : assign((C, E) => {
+            C.activeFrame.moveHeadToLabel(E.address.identifier);
+        }),
+// Configuration:13 ends here
 
 
 
 // Done with actions, now onto guards. Note guards appear in the above machine in "cond" fields. See XState docs for more.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:12]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:14]]
     },
     guards: {
-// Configuration:12 ends here
+// Configuration:14 ends here
 
 
 
 // Many guards are obvious from the perspective of the machine, we just defer them to other objects.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:13]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:15]]
         isBeyondEdge : (C, E) => C.activeFrame.isBeyondEdge(),
+        isBeyondEdgeAndStackIsNonEmpty : (C, E) => C.activeFrame.isBeyondEdge() && C.stack.length > 0,
         isCommaAtHead : (C, E) => C.activeFrame.isCommaAtHead(),
-// Configuration:13 ends here
+// Configuration:15 ends here
 
 
 
 // We need to check the category of the current block in order to branch execution.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:14]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:16]]
         isCurrentBlockValue : (C, E) => C.currentBlock.is(Category.Value),
         isCurrentBlockOp : (C, E) => C.currentBlock.is(Category.Op),
-// Configuration:14 ends here
+// Configuration:16 ends here
 
 
 
@@ -418,7 +538,7 @@ export const config = {
 // Before returning, invoke the service creator with the current context. Because we are using Immer, the service won't be able to edit anything about the context.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:15]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:17]]
     },
     services: {
         dispatchOnExecutor : (C, E) => {
@@ -430,17 +550,17 @@ export const config = {
 
             return executor(C);
         }
-// Configuration:15 ends here
+// Configuration:17 ends here
 
 
 
 // Close final config map.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:16]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:18]]
     }
 }
-// Configuration:16 ends here
+// Configuration:18 ends here
 
 // Initialize
 

@@ -93,6 +93,40 @@ it("Add executor works on numbers and strings, the same way JS does", async () =
 });
 #+end_src
 
+* Subtract Executor
+    
+#+begin_src js
+it("Simplest subtract executor", async () => {
+    const input = "0 subtract! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(0);
+});
+#+end_src
+
+#+begin_src js
+it("Simple subtract executor", async () => {
+    const input = "3, 2, 1 subtract! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(0);
+});
+#+end_src
+
+#+begin_src js
+it("Subtract executor on strings produces NaN", async () => {
+    const input = "\"Hello \", \"World!\" subtract! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(NaN);
+});
+#+end_src
+
+#+begin_src js
+it("Subtract executor on mixed numbers and strings produces NaN", async () => {
+    const input = "\"Hello \", 250, \"th World!\" subtract! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(NaN);
+});
+#+end_src
+
 * Multiply Executor
 
 #+begin_src js
@@ -126,6 +160,31 @@ it("Multiply expects at least one argument", async () => {
 });
 #+end_src
 
+* Divide executor
+
+#+begin_src js
+it("Divide executor when result is integer", async () => {
+    const input = "10, 2 divide! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+#+end_src
+
+#+begin_src js
+it("Divide executor when result is infinite decimal", async () => {
+    const input = "10, 3 divide! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(10 / 3);
+})
+#+end_src
+
+#+begin_src js
+it("Divide by zero is JS Infinity", async () => {
+    const input = "10, 0 divide! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(Infinity);
+})
+#+end_src
 * Basic labels
 
 #+begin_src js
@@ -141,5 +200,186 @@ it("Labeled block points to another labeled block as result", async () => {
     const input = "abcd: efgh, efgh: 5 abcd";
     const [ result ] = await interpretFile(input);
     expect(result).toBe(5);
+})
+#+end_src
+
+* Basic get and set executors
+
+#+begin_src js
+it("Get value at address", async () => {
+    const input = "abcd: 5 @abcd get! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+#+end_src
+
+#+begin_src js
+it("Set value at address", async () => {
+    const input = "5, @result set! _ result: _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+#+end_src
+
+#+begin_src js
+it("Set value at address then get it", async () => {
+    const input = "5, @result set! result: _ @result get! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+#+end_src
+
+* Conditional and not conditional jumps
+
+Jump into an argument list to an operator to prove that it actually jumped.
+
+#+begin_src js
+it("Unconditional jump", async () => {
+    const input = "@end jump! 5, end: 3 add! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(3);
+})
+#+end_src
+
+Acts just like unconditional jump.
+
+#+begin_src js
+it("Conditional jump with truthy conditional", async () => {
+    const input = "1, @end jump! 5, end: 3 add! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(3);
+})
+#+end_src
+
+Does not jump.
+
+#+begin_src js
+it("Conditional jump with falsy conditional doesn't jump", async () => {
+    const input = "0, @end jump! 5, end: 3 add! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(8);
+})
+#+end_src
+
+* Equal executor
+
+#+begin_src js
+it("Equal executor when true", async () => {
+    const input = "5, 5 equal! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
+it("Equal executor when true", async () => {
+    const input = "5, 42 equal! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(0);
+})
+#+end_src
+
+* And executor
+
+#+begin_src js
+it("And executor when true", async () => {
+    const input = "1, 2, 3 and! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
+it("And executor when false", async () => {
+    const input = "1, 0, 3 and! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(0);
+})
+#+end_src
+
+* Or executor
+
+#+begin_src js
+it("Or executor when true", async () => {
+    const input = "1, 0, 3 or! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
+it("Or executor when false", async () => {
+    const input = "0, 0, 0 or! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(0);
+})
+#+end_src
+
+* Less Than Executor
+
+#+begin_src js
+it("Less than executor when true", async () => {
+    const input = "1, 2, 3 lessThan! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
+it("Less than executor when false", async () => {
+    const input = "1, 2, 1 lessThan! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(0);
+})
+#+end_src
+* Greater Than Executor
+
+#+begin_src js
+it("Greater than executor when true", async () => {
+    const input = "2, 1 greaterThan! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
+it("Greater than executor when false", async () => {
+    const input = "1, 2 greaterThan! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(0);
+})
+#+end_src
+
+* Call a tape executor
+
+#+begin_src js
+it("Call an empty tape has no effect", async () => {
+    const input = "[ ] call! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(null);
+})
+#+end_src
+
+#+begin_src js
+it("Call an empty tape with params has no effect", async () => {
+    const input = "()[] call! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(null);
+})
+#+end_src
+
+#+begin_src js
+it("Call a tape puts first implicit return result in right place", async () => {
+    const input = "[ 3, 4 ] call! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(3);
+})
+#+end_src
+
+#+begin_src js
+it("Call a tape with an explicit return puts result in right place", async () => {
+    const input = "[ 3, 4 add! _ return! 5, 6 ] call! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(7);
 })
 #+end_src

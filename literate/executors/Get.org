@@ -1,0 +1,32 @@
+#+TITLE: Get Executor service
+#+PROPERTY: header-args    :comments both :tangle ../../src/executors/get.js
+
+Executors must be XState services and for this one we've chosen the callback type of service.
+
+#+begin_src js
+export const service = (C) => (sendParent, receiveParent) => {
+    const [ address ] = C.activeFrame.arguments;
+#+end_src
+
+First, set up for when we get the response from the step interpreter. We will just place the result and finish.
+
+#+begin_src js
+    receiveParent(({ type, block }) => {
+        switch(type) {
+            case "RESPONSE_EXECUTOR" :
+                sendParent({ type: "PLACE_OP_RESULT", block });
+                sendParent("DONE");
+                break;
+            default :
+                throw new Error(`Unexpected event type ${type}`);
+        }
+    })
+
+#+end_src
+
+Then, send the request to get the block at 
+
+#+begin_src js
+    sendParent({ type: "REQUEST_BLOCK_AT_ADDRESS", address });
+};
+#+end_src
