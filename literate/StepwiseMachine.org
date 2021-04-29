@@ -295,6 +295,8 @@ When the machine starts, its context just an empty object. Fill it with some nec
         initialize : assign((C, E) => {
             C.steps = 0;
             C.globalLabelsToExecutorServices = {};
+            C.nextFrameId = 0;
+            C.frameIdsToIdentifiersToClosedCells = {};
         }),
 #+end_src
 
@@ -305,7 +307,7 @@ The rest of the stack is empty.
 #+begin_src js
         loadProgram: assign((C, E) => {
             C.source = E.source;
-            C.activeFrame = Frame(E.source.tape);
+            C.activeFrame = Frame(C.nextFrameId++, E.source.tape);
             C.stack = [];
         }),
 #+end_src
@@ -401,7 +403,7 @@ There are a huge number of actions that op block executors can take in the cours
 #+begin_src js
         exec_callTape: assign((C, E) => {
             C.stack.push(C.activeFrame);
-            C.activeFrame = Frame(E.tape)
+            C.activeFrame = Frame(C.nextFrameId++, E.tape, E.arguments, C.activeFrame);
         }),
         exec_placeResult: assign((C, E) => {
             C.activeFrame.placeResult(E.block);

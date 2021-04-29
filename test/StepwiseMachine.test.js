@@ -38,6 +38,6 @@ it("Can load a program", async () => {
     const tree = await parseFile("1 2 3");
     interpreter.send({ type: "LOAD_PROGRAM", source: tree });
     expect(interpreter.S).toMatchState("run.read");
-    expect(interpreter.C.activeFrame).toEqual(Frame(tree.tape));
+    expect(interpreter.C.activeFrame).toEqual(Frame(0, tree.tape));
 })
 // Tests:2 ends here

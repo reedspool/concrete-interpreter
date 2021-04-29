@@ -23,7 +23,7 @@ export const service = (C) => (sendParent, receiveParent) => {
         
     // First clear arguments, since after call_tape the step interpreter will be our new frame.
     sendParent({ type: "CLEAR_ARGUMENTS" });
-    sendParent({ type: "CALL_TAPE", tape, args });
+    sendParent({ type: "CALL_TAPE", tape, arguments: args });
     sendParent("DONE_NO_ADVANCE");
 };
 // No heading:1 ends here

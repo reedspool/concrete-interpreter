@@ -403,3 +403,19 @@ it("Call a tape with an explicit return puts result in right place", async () =>
     expect(result).toBe(7);
 })
 // Call a tape executor:4 ends here
+
+// [[file:../literate/InterpreterTests.org::*Call a tape executor][Call a tape executor:5]]
+it("Call a tape with parameters", async () => {
+    const input = "5, (n)[ n, n multiply! _ ] call! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(25);
+})
+// Call a tape executor:5 ends here
+
+// [[file:../literate/InterpreterTests.org::*Call a tape executor][Call a tape executor:6]]
+it("Call a tape with a closure", async () => {
+    const input = "42, (n)[ [ n ] ] call! _ call! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(42);
+})
+// Call a tape executor:6 ends here

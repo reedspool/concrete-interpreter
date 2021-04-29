@@ -347,6 +347,8 @@ export const config = {
         initialize : assign((C, E) => {
             C.steps = 0;
             C.globalLabelsToExecutorServices = {};
+            C.nextFrameId = 0;
+            C.frameIdsToIdentifiersToClosedCells = {};
         }),
 // Configuration:2 ends here
 
@@ -360,7 +362,7 @@ export const config = {
 // [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:3]]
         loadProgram: assign((C, E) => {
             C.source = E.source;
-            C.activeFrame = Frame(E.source.tape);
+            C.activeFrame = Frame(C.nextFrameId++, E.source.tape);
             C.stack = [];
         }),
 // Configuration:3 ends here
@@ -483,7 +485,7 @@ export const config = {
 // [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:13]]
         exec_callTape: assign((C, E) => {
             C.stack.push(C.activeFrame);
-            C.activeFrame = Frame(E.tape)
+            C.activeFrame = Frame(C.nextFrameId++, E.tape, E.arguments, C.activeFrame);
         }),
         exec_placeResult: assign((C, E) => {
             C.activeFrame.placeResult(E.block);
