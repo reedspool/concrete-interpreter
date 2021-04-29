@@ -53,7 +53,10 @@ class _Frame {
 // [[file:../literate/Frame.org::+begin_src js][No heading:4]]
         this.references = {};
         Object.entries(this.tape.references).forEach(([ label, reference]) => {
-            this.references[label] = { ...reference, frameId: this.id };
+            this.references[label] = {
+                ...reference,
+                frameId: reference.frameId ?? this.id
+            };
         });
 
         this.tape.cells.forEach((block) => {
@@ -125,15 +128,15 @@ class _Frame {
 
     moveHeadToLabel(label) { this.head = this.tape.getIndexOfLabel(label); }
 
-    getBlockAtLabel(label) {
+    getBlockByLabel(label) {
         const { type, index } = this.tape.references[label];
 
         if (type == "param") return this.actualArgumentCells[index];
 
-        return this.tape.getBlockAtLabel(label);
+        return this.tape.getBlockByLabel(label);
     }
 
-    setBlockAtLabel(label, block) { return this.tape.setBlockAtLabel(label, block); }
+    setBlockByLabel(label, block) { return this.tape.setBlockByLabel(label, block); }
 
     appendBlockToArguments(block) { this.arguments.push(block); }
 // No heading:6 ends here
@@ -153,32 +156,9 @@ class _Frame {
 
 
 
-// Resolving identifiers is a complex process. This method accepts any block and only performs that process if the block is a value identifier. This means callers do not need to check first, and it provides a base case for the recursive flow.
-
-// First, a value identifier may point to another value identifier, in which case we recurse on the same process.
-
-// The simplest case is the value identifier which points to a label on the same tape, in which case this frame handles it all.
-
-// The next simplest case is the value identifier which points to a parameter to the current tape. Again, this frame can handle that.
+// Close class.
 
 
 // [[file:../literate/Frame.org::+begin_src js][No heading:8]]
-    resolveMaybeValueIdentifier(block) {
-        const { identifier } = block;
-        let found;
-        
-        if (! block.is(Category.Value, "ValueIdentifier")) {
-            return block;
-        }
-
-        // Local on tape or parameter
-        found = this.getBlockAtLabel(identifier);
-        if (found) return this.resolveMaybeValueIdentifier(found);
-
-        if (! found) throw new Error(
-            `Unable to find label "${identifier}"`);
-        
-        return found;
-    }
 }
 // No heading:8 ends here

@@ -11,11 +11,7 @@ import { parseFile } from "concrete-parser";
 import { TestInterpreter, toMatchState } from "xstate-jest-tools";
 expect.extend({ toMatchState });
 
-const stepwiseMachine =
-    Machine(StepwiseMachine.definition)
-        .withConfig(StepwiseMachine.config)
-        // Supply empty context to avoid warning
-        .withContext({});
+const stepwiseMachine = StepwiseMachine.init(); 
 
 let interpreter;
 

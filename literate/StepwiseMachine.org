@@ -8,6 +8,7 @@ This XState Machine will interpret Concrete programs in a step-wise fashion, tha
 #+begin_src js
 import { Machine, sendParent, send } from "xstate";
 import { assign } from "@xstate/immer";
+import {immerable} from "immer";
 import { Frame } from "./Frame";
 import { Category } from "concrete-parser";
 const MAX_STEPS = 100;
@@ -296,7 +297,7 @@ When the machine starts, its context just an empty object. Fill it with some nec
             C.steps = 0;
             C.globalLabelsToExecutorServices = {};
             C.nextFrameId = 0;
-            C.frameIdsToIdentifiersToClosedCells = {};
+            C.deadFrameIdsToLabelsToClosedCells = {};
         }),
 #+end_src
 
@@ -328,12 +329,27 @@ Either way, if the value is a ValueIdentifier, we have to resolve it to its prop
         clearArguments: assign((C, E) => {
             C.activeFrame.clearArguments();
         }),
+#+end_src
+
+Arguments list can never include ValueIdentifiers, so always resolve them to their true value.
+
+#+begin_src js
+
         appendArgumentsWithCurrentBlock : assign((C, E) => {
-            C.activeFrame.appendBlockAtHeadValueToArguments();
+            let block = C.activeFrame.getBlockAtHead();
+            if (block.is(Category.Value, "ValueIdentifier")) {
+                block = Utils.resolveAndGet(C, block);
+            }
+            C.activeFrame.appendBlockToArguments(block);
         }),
         replaceArgumentsWithCurrentBlock : assign((C, E) => {
             C.activeFrame.clearArguments();
-            C.activeFrame.appendBlockAtHeadValueToArguments();
+
+            let block = C.activeFrame.getBlockAtHead();
+            if (block.is(Category.Value, "ValueIdentifier")) {
+                block = Utils.resolveAndGet(C, block);
+            }
+            C.activeFrame.appendBlockToArguments(block);
         }),
 #+end_src
 
@@ -377,8 +393,16 @@ Let our parent know when they can safely send a "STEP" event. When our parent wa
 
 Pop the stack, disposing of the current frame and replacing it with the top of the stack.
 
+Before we dispose of the current frame, close all its references and move any closed cells into their new home, in the interpreter context.
+
 #+begin_src js
         popFrame : assign((C, E) => {
+            const labelsToClosedCells = C.activeFrame.closeReferences();
+
+            if (Object.values(labelsToClosedCells).length > 0) {
+                C.deadFrameIdsToLabelsToClosedCells[C.activeFrame.id] = labelsToClosedCells;
+            }
+
             C.activeFrame = C.stack.pop();
         }),
 #+end_src
@@ -409,11 +433,11 @@ There are a huge number of actions that op block executors can take in the cours
             C.activeFrame.placeResult(E.block);
         }),
         exec_reqBlockAtAddress : send((C, E) => {
-            const block = C.activeFrame.getBlockAtLabel(E.address.identifier);
+            const block = Utils.resolveAndGet(C, E.address);
             return { type : "RESPONSE_EXECUTOR", block };
         }, { to: "executor" }),
         exec_placeBlockAtAddress : assign((C, E) => {
-            C.activeFrame.setBlockAtLabel(E.address.identifier, E.block);
+            C.activeFrame.setBlockByLabel(E.address.identifier, E.block);
         }),
         exec_moveHeadToAddress : assign((C, E) => {
             C.activeFrame.moveHeadToLabel(E.address.identifier);
@@ -466,16 +490,128 @@ Close final config map.
     }
 }
 #+end_src
-* Context
+* Utils
 
-The context for this machine will be a class, primarily because multiple actions will reuse code, and classes are a simple way to do that.
+Utilities that will get used in multiple places in the machine context.
 
-This class was not created when the machine implementation began, so much of the code remains in actions.
+I tried making the machine's context a class with methods, but somewhere in XState internals it converted to a normal object.
 
 In the future, perhaps all actions will just dispatch to this class, e.g. ={ myAction : XStateImmer.assign((C, E) => { C.x = E.y; }) }=, will just be =[ "myAction" ].forEach((action) => XStateImmer.assign((C, E) => C[action](E))=.
 
 #+begin_src js
-export class Context {
+export const Utils = {
+#+end_src
+
+Any time we need to determine the location of a label, it will follow the same process. We call this process resolving, and the product a resolution. A resolution is a succinct description of a location in the entire program. The location is either on the stack in a live frame or in a closed cell in the interpreter.
+
+#+begin_src js
+    resolve(C, block, frame, options = { recurse: true }) {
+        const { frameId, identifier: label } = block;
+        let resolution = { frameId, label };
+
+        // Is this block captured by a frame?
+        if (frameId) {
+            const labelsToClosedCells =
+                C.deadFrameIdsToLabelsToClosedCells[frameId];
+
+            // Is the frame dead and the value closed?
+            if (labelsToClosedCells) {
+                resolution.type = "closed";
+            }
+            // The frame is alive and the value is on the stack
+            else {
+                resolution.type = "stack";
+            }
+        }
+        // This is not a captured value, so must derive from frame.references
+        else {
+            resolution.frameId = frame.id;
+            const reference = frame.references[label];
+            if (! reference) throw new Error(`Could not find reference for ${label}`);
+
+            // Local/param values are always on their frame
+            if (reference.type == "local" || reference.type == "param") {
+                resolution.type = "stack";
+            }
+            // This is an upvalue
+            else {
+                const { frameId: referenceFrameId } = reference;
+                const labelsToClosedCells =
+                    C.deadFrameIdsToLabelsToClosedCells[
+                        referenceFrameId];
+                
+                // Is the frame dead and the value closed?
+                if (labelsToClosedCells) {
+                    resolution.type = "closed";
+                    resolution.frameId = referenceFrameId;
+                }
+                // The frame is alive and the value is on the stack
+                else {
+                    resolution.type = "stack";
+                    resolution.frameId = referenceFrameId;
+                }
+            }
+        }
+
+#+end_src
+
+Sometimes we want just the location of the given block, and other times we want to find the end block in a possible chain of value references.
+
+#+begin_src js
+        if (options.recurse) {
+            block = Utils.getBlock(C, resolution);
+
+            if (block.is(Category.Value, "ValueIdentifier")) {
+                if (resolution.frameId !== frameId) {
+                    frame = Utils.getFrameById(C, resolution.frameId);
+
+                    resolution = Utils.resolve(C, block, frame, options);
+                }
+            }
+        }
+
+        return resolution;
+    },
+#+end_src
+
+Get an actual block given a resolution.
+
+#+begin_src js
+    getBlock(C, { type, label, frameId }) {
+        if (type == "closed") {
+            return C.deadFrameIdsToLabelsToClosedCells[frameId][label];
+        }
+        else if (type == "stack") {
+            const frame = Utils.getFrameById(C, frameId);
+
+            return frame.getBlockByLabel(label);
+        }
+
+        throw new Error(`Unable to get block for resolution ${type}-${label}-${frameId}`)
+    },
+#+end_src
+
+Further utilities using the above.
+
+#+begin_src js
+    resolveAndGet(C, block) {
+        return Utils.getBlock(C, Utils.resolve(C, block, C.activeFrame));
+    },
+#+end_src
+
+Find a frame on the stack by its ID
+
+#+begin_src js
+    getFrameById(C, id) {
+        if (C.activeFrame.id == id) return C.activeFrame;
+
+        return C.stack.find((frame) => frame.id == id);
+    },
+#+end_src
+
+Close utils.
+
+#+begin_src js
 }
 #+end_src
 
@@ -484,5 +620,5 @@ export class Context {
 Start with an empty context.
 
 #+begin_src js
-export const init = () => Machine(definition, config).withContext(new Context);
+export const init = () => Machine(definition, config).withContext({});
 #+end_src

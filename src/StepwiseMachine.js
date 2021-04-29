@@ -4,6 +4,7 @@
 // [[file:../literate/StepwiseMachine.org::*Preamble][Preamble:1]]
 import { Machine, sendParent, send } from "xstate";
 import { assign } from "@xstate/immer";
+import {immerable} from "immer";
 import { Frame } from "./Frame";
 import { Category } from "concrete-parser";
 const MAX_STEPS = 100;
@@ -348,7 +349,7 @@ export const config = {
             C.steps = 0;
             C.globalLabelsToExecutorServices = {};
             C.nextFrameId = 0;
-            C.frameIdsToIdentifiersToClosedCells = {};
+            C.deadFrameIdsToLabelsToClosedCells = {};
         }),
 // Configuration:2 ends here
 
@@ -389,75 +390,100 @@ export const config = {
         clearArguments: assign((C, E) => {
             C.activeFrame.clearArguments();
         }),
+// Configuration:5 ends here
+
+
+
+// Arguments list can never include ValueIdentifiers, so always resolve them to their true value.
+
+
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:6]]
         appendArgumentsWithCurrentBlock : assign((C, E) => {
-            C.activeFrame.appendBlockAtHeadValueToArguments();
+            let block = C.activeFrame.getBlockAtHead();
+            if (block.is(Category.Value, "ValueIdentifier")) {
+                block = Utils.resolveAndGet(C, block);
+            }
+            C.activeFrame.appendBlockToArguments(block);
         }),
         replaceArgumentsWithCurrentBlock : assign((C, E) => {
             C.activeFrame.clearArguments();
-            C.activeFrame.appendBlockAtHeadValueToArguments();
+
+            let block = C.activeFrame.getBlockAtHead();
+            if (block.is(Category.Value, "ValueIdentifier")) {
+                block = Utils.resolveAndGet(C, block);
+            }
+            C.activeFrame.appendBlockToArguments(block);
         }),
-// Configuration:5 ends here
+// Configuration:6 ends here
 
 
 
 // Advance the head of the tape one to the right.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:6]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:7]]
         advanceHead : assign((C, E) => {
             C.activeFrame.advance();
         }),
-// Configuration:6 ends here
+// Configuration:7 ends here
 
 
 
 // When the program ends or the current tape ends, we set the frame to halted.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:7]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:8]]
         haltFrame : assign((C, E) => {
             C.activeFrame.halt();
         }),
-// Configuration:7 ends here
+// Configuration:8 ends here
 
 
 
 // When the interpreter encounters a run-time error, that is not an exception in the JavaScript run-time. Save an error object without throwing it.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:8]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:9]]
         reportErrorInvalidCategoryOfCurrentBlock : assign((C, E) => {
             C.error = new Error("Invalid category of current block");
         }),
-// Configuration:8 ends here
+// Configuration:9 ends here
 
 
 
 // Let our parent know when they can safely send a "STEP" event. When our parent wants to successively step through the whole program, this will ensure they don't send too many "STEP" events. When our parent is a step debugger UI, if they don't receive this event in a very short period of time, they could move to a "working" state to show that the UI isn't ready to be stepped forward yet.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:9]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:10]]
         reportReadyToStep : sendParent((C, E) => {
             return { type: "READY_TO_STEP" };
         }),
-// Configuration:9 ends here
+// Configuration:10 ends here
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:10]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:11]]
         loadGlobalLabel: assign((C, E) => {
             C.globalLabelsToExecutorServices[E.label] = E.service;
         }),
-// Configuration:10 ends here
+// Configuration:11 ends here
 
 
 
 // Pop the stack, disposing of the current frame and replacing it with the top of the stack.
 
+// Before we dispose of the current frame, close all its references and move any closed cells into their new home, in the interpreter context.
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:11]]
+
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:12]]
         popFrame : assign((C, E) => {
+            const labelsToClosedCells = C.activeFrame.closeReferences();
+
+            if (Object.values(labelsToClosedCells).length > 0) {
+                C.deadFrameIdsToLabelsToClosedCells[C.activeFrame.id] = labelsToClosedCells;
+            }
+
             C.activeFrame = C.stack.pop();
         }),
-// Configuration:11 ends here
+// Configuration:12 ends here
 
 
 
@@ -468,21 +494,21 @@ export const config = {
 // If the arguments list is empty, do nothing.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:12]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:13]]
         placeResultOnLowerFrame : assign((C, E) => {
             const [ result ] = C.activeFrame.arguments;
             if (! result) return;
             const lastFrame = C.stack[C.stack.length - 1];
             lastFrame.placeResult(result);
         }),
-// Configuration:12 ends here
+// Configuration:13 ends here
 
 
 
 // There are a huge number of actions that op block executors can take in the course of their invocation. They are all prefixed with `exec_`.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:13]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:14]]
         exec_callTape: assign((C, E) => {
             C.stack.push(C.activeFrame);
             C.activeFrame = Frame(C.nextFrameId++, E.tape, E.arguments, C.activeFrame);
@@ -491,47 +517,47 @@ export const config = {
             C.activeFrame.placeResult(E.block);
         }),
         exec_reqBlockAtAddress : send((C, E) => {
-            const block = C.activeFrame.getBlockAtLabel(E.address.identifier);
+            const block = Utils.resolveAndGet(C, E.address);
             return { type : "RESPONSE_EXECUTOR", block };
         }, { to: "executor" }),
         exec_placeBlockAtAddress : assign((C, E) => {
-            C.activeFrame.setBlockAtLabel(E.address.identifier, E.block);
+            C.activeFrame.setBlockByLabel(E.address.identifier, E.block);
         }),
         exec_moveHeadToAddress : assign((C, E) => {
             C.activeFrame.moveHeadToLabel(E.address.identifier);
         }),
-// Configuration:13 ends here
+// Configuration:14 ends here
 
 
 
 // Done with actions, now onto guards. Note guards appear in the above machine in "cond" fields. See XState docs for more.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:14]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:15]]
     },
     guards: {
-// Configuration:14 ends here
+// Configuration:15 ends here
 
 
 
 // Many guards are obvious from the perspective of the machine, we just defer them to other objects.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:15]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:16]]
         isBeyondEdge : (C, E) => C.activeFrame.isBeyondEdge(),
         isBeyondEdgeAndStackIsNonEmpty : (C, E) => C.activeFrame.isBeyondEdge() && C.stack.length > 0,
         isCommaAtHead : (C, E) => C.activeFrame.isCommaAtHead(),
-// Configuration:15 ends here
+// Configuration:16 ends here
 
 
 
 // We need to check the category of the current block in order to branch execution.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:16]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:17]]
         isCurrentBlockValue : (C, E) => C.currentBlock.is(Category.Value),
         isCurrentBlockOp : (C, E) => C.currentBlock.is(Category.Op),
-// Configuration:16 ends here
+// Configuration:17 ends here
 
 
 
@@ -540,7 +566,7 @@ export const config = {
 // Before returning, invoke the service creator with the current context. Because we are using Immer, the service won't be able to edit anything about the context.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:17]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:18]]
     },
     services: {
         dispatchOnExecutor : (C, E) => {
@@ -552,31 +578,160 @@ export const config = {
 
             return executor(C);
         }
-// Configuration:17 ends here
+// Configuration:18 ends here
 
 
 
 // Close final config map.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:18]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:19]]
     }
 }
-// Configuration:18 ends here
+// Configuration:19 ends here
 
-// Context
+// Utils
 
-// The context for this machine will be a class, primarily because multiple actions will reuse code, and classes are a simple way to do that.
+// Utilities that will get used in multiple places in the machine context.
 
-// This class was not created when the machine implementation began, so much of the code remains in actions.
+// I tried making the machine's context a class with methods, but somewhere in XState internals it converted to a normal object.
 
 // In the future, perhaps all actions will just dispatch to this class, e.g. ={ myAction : XStateImmer.assign((C, E) => { C.x = E.y; }) }=, will just be =[ "myAction" ].forEach((action) => XStateImmer.assign((C, E) => C[action](E))=.
 
 
-// [[file:../literate/StepwiseMachine.org::*Context][Context:1]]
-export class Context {
+// [[file:../literate/StepwiseMachine.org::*Utils][Utils:1]]
+export const Utils = {
+// Utils:1 ends here
+
+
+
+// Any time we need to determine the location of a label, it will follow the same process. We call this process resolving, and the product a resolution. A resolution is a succinct description of a location in the entire program. The location is either on the stack in a live frame or in a closed cell in the interpreter.
+
+
+// [[file:../literate/StepwiseMachine.org::*Utils][Utils:2]]
+    resolve(C, block, frame, options = { recurse: true }) {
+        const { frameId, identifier: label } = block;
+        let resolution = { frameId, label };
+
+        // Is this block captured by a frame?
+        if (frameId) {
+            const labelsToClosedCells =
+                C.deadFrameIdsToLabelsToClosedCells[frameId];
+
+            // Is the frame dead and the value closed?
+            if (labelsToClosedCells) {
+                resolution.type = "closed";
+            }
+            // The frame is alive and the value is on the stack
+            else {
+                resolution.type = "stack";
+            }
+        }
+        // This is not a captured value, so must derive from frame.references
+        else {
+            resolution.frameId = frame.id;
+            const reference = frame.references[label];
+            if (! reference) throw new Error(`Could not find reference for ${label}`);
+
+            // Local/param values are always on their frame
+            if (reference.type == "local" || reference.type == "param") {
+                resolution.type = "stack";
+            }
+            // This is an upvalue
+            else {
+                const { frameId: referenceFrameId } = reference;
+                const labelsToClosedCells =
+                    C.deadFrameIdsToLabelsToClosedCells[
+                        referenceFrameId];
+                
+                // Is the frame dead and the value closed?
+                if (labelsToClosedCells) {
+                    resolution.type = "closed";
+                    resolution.frameId = referenceFrameId;
+                }
+                // The frame is alive and the value is on the stack
+                else {
+                    resolution.type = "stack";
+                    resolution.frameId = referenceFrameId;
+                }
+            }
+        }
+// Utils:2 ends here
+
+
+
+// Sometimes we want just the location of the given block, and other times we want to find the end block in a possible chain of value references.
+
+
+// [[file:../literate/StepwiseMachine.org::*Utils][Utils:3]]
+        if (options.recurse) {
+            block = Utils.getBlock(C, resolution);
+
+            if (block.is(Category.Value, "ValueIdentifier")) {
+                if (resolution.frameId !== frameId) {
+                    frame = Utils.getFrameById(C, resolution.frameId);
+
+                    resolution = Utils.resolve(C, block, frame, options);
+                }
+            }
+        }
+
+        return resolution;
+    },
+// Utils:3 ends here
+
+
+
+// Get an actual block given a resolution.
+
+
+// [[file:../literate/StepwiseMachine.org::*Utils][Utils:4]]
+    getBlock(C, { type, label, frameId }) {
+        if (type == "closed") {
+            return C.deadFrameIdsToLabelsToClosedCells[frameId][label];
+        }
+        else if (type == "stack") {
+            const frame = Utils.getFrameById(C, frameId);
+
+            return frame.getBlockByLabel(label);
+        }
+
+        throw new Error(`Unable to get block for resolution ${type}-${label}-${frameId}`)
+    },
+// Utils:4 ends here
+
+
+
+// Further utilities using the above.
+
+
+// [[file:../literate/StepwiseMachine.org::*Utils][Utils:5]]
+    resolveAndGet(C, block) {
+        return Utils.getBlock(C, Utils.resolve(C, block, C.activeFrame));
+    },
+// Utils:5 ends here
+
+
+
+// Find a frame on the stack by its ID
+
+
+// [[file:../literate/StepwiseMachine.org::*Utils][Utils:6]]
+    getFrameById(C, id) {
+        if (C.activeFrame.id == id) return C.activeFrame;
+
+        return C.stack.find((frame) => frame.id == id);
+    },
+// Utils:6 ends here
+
+
+
+// Close utils.
+
+
+// [[file:../literate/StepwiseMachine.org::*Utils][Utils:7]]
 }
-// Context:1 ends here
+// Utils:7 ends here
 
 // Initialize
 
@@ -584,5 +739,5 @@ export class Context {
 
 
 // [[file:../literate/StepwiseMachine.org::*Initialize][Initialize:1]]
-export const init = () => Machine(definition, config).withContext(new Context);
+export const init = () => Machine(definition, config).withContext({});
 // Initialize:1 ends here
