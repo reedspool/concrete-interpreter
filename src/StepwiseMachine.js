@@ -564,11 +564,25 @@ export const config = {
 }
 // Configuration:18 ends here
 
+// Context
+
+// The context for this machine will be a class, primarily because multiple actions will reuse code, and classes are a simple way to do that.
+
+// This class was not created when the machine implementation began, so much of the code remains in actions.
+
+// In the future, perhaps all actions will just dispatch to this class, e.g. ={ myAction : XStateImmer.assign((C, E) => { C.x = E.y; }) }=, will just be =[ "myAction" ].forEach((action) => XStateImmer.assign((C, E) => C[action](E))=.
+
+
+// [[file:../literate/StepwiseMachine.org::*Context][Context:1]]
+export class Context {
+}
+// Context:1 ends here
+
 // Initialize
 
 // Start with an empty context.
 
 
 // [[file:../literate/StepwiseMachine.org::*Initialize][Initialize:1]]
-export const init = () => Machine(definition, config).withContext({});
+export const init = () => Machine(definition, config).withContext(new Context);
 // Initialize:1 ends here

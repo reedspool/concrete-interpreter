@@ -466,10 +466,23 @@ Close final config map.
     }
 }
 #+end_src
+* Context
+
+The context for this machine will be a class, primarily because multiple actions will reuse code, and classes are a simple way to do that.
+
+This class was not created when the machine implementation began, so much of the code remains in actions.
+
+In the future, perhaps all actions will just dispatch to this class, e.g. ={ myAction : XStateImmer.assign((C, E) => { C.x = E.y; }) }=, will just be =[ "myAction" ].forEach((action) => XStateImmer.assign((C, E) => C[action](E))=.
+
+#+begin_src js
+export class Context {
+}
+#+end_src
+
 * Initialize
 
 Start with an empty context.
 
 #+begin_src js
-export const init = () => Machine(definition, config).withContext({});
+export const init = () => Machine(definition, config).withContext(new Context);
 #+end_src
