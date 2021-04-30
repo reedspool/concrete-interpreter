@@ -11,7 +11,7 @@ import { assign } from "@xstate/immer";
 import {immerable} from "immer";
 import { Frame } from "./Frame";
 import { Category } from "concrete-parser";
-const MAX_STEPS = 100;
+const MAX_STEPS = 10000;
 #+end_src
 
 * Definition
