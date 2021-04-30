@@ -96,19 +96,28 @@ A lot of binary, algebraic operators in JS are very similar in their constructio
 
 #+begin_src js
         { label: "add", service: createExecutor((a, b) => a + b) },
+        { label: "+", service: createExecutor((a, b) => a + b) },
         { label: "subtract", service: createExecutor((a, b) => a - b) },
+        { label: "-", service: createExecutor((a, b) => a - b) },
         { label: "multiply", service: createExecutor((a, b) => a * b) },
+        { label: "*", service: createExecutor((a, b) => a * b) },
         { label: "divide", service: createExecutor((a, b) => a / b) },
+        { label: "/", service: createExecutor((a, b) => a / b) },
 #+end_src
 
 Zero is the only false-y value in Concrete. There are no proper boolean values (yet). For all operators which return booleans, convert them to either a 1 or 0.
 
 #+begin_src js
         { label: "equal", service: createExecutor((a, b) => a === b, (n) => n ? 1 : 0) },
+        { label: "=", service: createExecutor((a, b) => a === b, (n) => n ? 1 : 0) },
         { label: "and", service: createExecutor((a, b) => a && b, (n) => n ? 1 : 0) },
+        { label: "&", service: createExecutor((a, b) => a && b, (n) => n ? 1 : 0) },
         { label: "or", service: createExecutor((a, b) => a || b, (n) => n ? 1 : 0) },
+        { label: "|", service: createExecutor((a, b) => a || b, (n) => n ? 1 : 0) },
         { label: "lessThan", service: createExecutor((a, b) => a < b, (n) => n ? 1 : 0) },
+        { label: "<", service: createExecutor((a, b) => a < b, (n) => n ? 1 : 0) },
         { label: "greaterThan", service: createExecutor((a, b) => a > b, (n) => n ? 1 : 0) },
+        { label: ">", service: createExecutor((a, b) => a > b, (n) => n ? 1 : 0) },
     ].forEach(
         ({ label, service }) => runInterpreter.send(
             { type: "LOAD_GLOBAL_LABEL", label, service }));

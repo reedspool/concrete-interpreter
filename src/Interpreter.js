@@ -114,9 +114,13 @@ export const interpretFile = async (source) => {
 
 // [[file:../literate/Interpreter.org::*Interpret File][Interpret File:8]]
         { label: "add", service: createExecutor((a, b) => a + b) },
+        { label: "+", service: createExecutor((a, b) => a + b) },
         { label: "subtract", service: createExecutor((a, b) => a - b) },
+        { label: "-", service: createExecutor((a, b) => a - b) },
         { label: "multiply", service: createExecutor((a, b) => a * b) },
+        { label: "*", service: createExecutor((a, b) => a * b) },
         { label: "divide", service: createExecutor((a, b) => a / b) },
+        { label: "/", service: createExecutor((a, b) => a / b) },
 // Interpret File:8 ends here
 
 
@@ -126,10 +130,15 @@ export const interpretFile = async (source) => {
 
 // [[file:../literate/Interpreter.org::*Interpret File][Interpret File:9]]
         { label: "equal", service: createExecutor((a, b) => a === b, (n) => n ? 1 : 0) },
+        { label: "=", service: createExecutor((a, b) => a === b, (n) => n ? 1 : 0) },
         { label: "and", service: createExecutor((a, b) => a && b, (n) => n ? 1 : 0) },
+        { label: "&", service: createExecutor((a, b) => a && b, (n) => n ? 1 : 0) },
         { label: "or", service: createExecutor((a, b) => a || b, (n) => n ? 1 : 0) },
+        { label: "|", service: createExecutor((a, b) => a || b, (n) => n ? 1 : 0) },
         { label: "lessThan", service: createExecutor((a, b) => a < b, (n) => n ? 1 : 0) },
+        { label: "<", service: createExecutor((a, b) => a < b, (n) => n ? 1 : 0) },
         { label: "greaterThan", service: createExecutor((a, b) => a > b, (n) => n ? 1 : 0) },
+        { label: ">", service: createExecutor((a, b) => a > b, (n) => n ? 1 : 0) },
     ].forEach(
         ({ label, service }) => runInterpreter.send(
             { type: "LOAD_GLOBAL_LABEL", label, service }));

@@ -93,6 +93,14 @@ it("Add executor works on numbers and strings, the same way JS does", async () =
 });
 #+end_src
 
+#+begin_src js
+it("Simple add operator executor", async () => {
+    const input = "1, 2, 3 + _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(6);
+});
+#+end_src
+
 * Subtract Executor
     
 #+begin_src js
@@ -106,6 +114,14 @@ it("Simplest subtract executor", async () => {
 #+begin_src js
 it("Simple subtract executor", async () => {
     const input = "3, 2, 1 subtract! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(0);
+});
+#+end_src
+
+#+begin_src js
+it("Simple minus operator executor", async () => {
+    const input = "3, 2, 1 - _";
     const [ result ] = await interpretFile(input);
     expect(result).toEqual(0);
 });
@@ -146,6 +162,14 @@ it("Simple multiply executor", async () => {
 #+end_src
 
 #+begin_src js
+it("Simple multiply operator executor", async () => {
+    const input = "1, 2, 3, 4 * _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toEqual(24);
+});
+#+end_src
+
+#+begin_src js
 it("Multiply executor turns Strings to NaNs", async () => {
     const input = "\"Hello \", \"World!\" multiply! _";
     const [ result ] = await interpretFile(input);
@@ -173,6 +197,14 @@ it("Divide executor when result is integer", async () => {
 #+begin_src js
 it("Divide executor when result is infinite decimal", async () => {
     const input = "10, 3 divide! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(10 / 3);
+})
+#+end_src
+
+#+begin_src js
+it("Divide operator executor when result is infinite decimal", async () => {
+    const input = "10, 3 / _";
     const [ result ] = await interpretFile(input);
     expect(result).toBe(10 / 3);
 })
@@ -272,7 +304,15 @@ it("Equal executor when true", async () => {
 #+end_src
 
 #+begin_src js
-it("Equal executor when true", async () => {
+it("Equal operator executor when true", async () => {
+    const input = "5, 5 = _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
+it("Equal executor when false", async () => {
     const input = "5, 42 equal! _";
     const [ result ] = await interpretFile(input);
     expect(result).toBe(0);
@@ -284,6 +324,14 @@ it("Equal executor when true", async () => {
 #+begin_src js
 it("And executor when true", async () => {
     const input = "1, 2, 3 and! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
+it("And operator executor when true", async () => {
+    const input = "1, 2, 3 & _";
     const [ result ] = await interpretFile(input);
     expect(result).toBe(1);
 })
@@ -308,6 +356,14 @@ it("Or executor when true", async () => {
 #+end_src
 
 #+begin_src js
+it("Or operator executor when true", async () => {
+    const input = "1, 0, 3 | _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
 it("Or executor when false", async () => {
     const input = "0, 0, 0 or! _";
     const [ result ] = await interpretFile(input);
@@ -326,6 +382,14 @@ it("Less than executor when true", async () => {
 #+end_src
 
 #+begin_src js
+it("Less than operator executor when true", async () => {
+    const input = "1, 2 < _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
 it("Less than executor when false", async () => {
     const input = "5, 2 lessThan! _";
     const [ result ] = await interpretFile(input);
@@ -337,6 +401,14 @@ it("Less than executor when false", async () => {
 #+begin_src js
 it("Greater than executor when true", async () => {
     const input = "2, 1 greaterThan! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
+it("Greater than operator executor when true", async () => {
+    const input = "2, 1 > _";
     const [ result ] = await interpretFile(input);
     expect(result).toBe(1);
 })
@@ -407,4 +479,14 @@ it("Call a tape with a user-defined call executor", async () => {
     expect(result).toBe(42);
 })
 
+#+end_src
+
+* Rename a global executor
+
+#+begin_src js
+it("Renaming a global executor still works", async () => {
+    const input = "abcd: greaterThan 1, 2 abcd! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(0);
+})
 #+end_src
