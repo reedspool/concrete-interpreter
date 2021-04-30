@@ -11,6 +11,8 @@ import { service as getExecutorService } from "./executors/get";
 import { service as setExecutorService } from "./executors/set";
 import { service as jumpExecutorService } from "./executors/jump";
 import { service as callExecutorService } from "./executors/call";
+import { service as printExecutorService } from "./executors/print";
+import { service as jsDebugExecutorService } from "./executors/jsDebug";
 import { service as explicitReturnExecutorService } from "./executors/explicitReturn";
 // Preamble:1 ends here
 
@@ -100,6 +102,8 @@ export const interpretFile = async (source) => {
         { label: "set", service: setExecutorService },
         { label: "jump", service: jumpExecutorService },
         { label: "call", service: callExecutorService },
+        { label: "print", service: printExecutorService },
+        { label: "debugger", service: jsDebugExecutorService },
         { label: "return", service: explicitReturnExecutorService },
 // Interpret File:7 ends here
 

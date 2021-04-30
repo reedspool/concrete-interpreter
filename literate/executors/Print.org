@@ -1,0 +1,14 @@
+#+TITLE: Print Executor service
+#+PROPERTY: header-args    :comments both :tangle ../../src/executors/print.js
+
+Executors must be XState services and for this one we've chosen the callback type of service.
+
+#+begin_src js
+export const service = (C) => (sendParent, receiveParent) => {
+    console.log(C.activeFrame.arguments.map(block => block.asJS()));
+    sendParent("DONE");
+};
+#+end_src
+
+
+
