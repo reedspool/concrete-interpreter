@@ -319,7 +319,7 @@ it("Or executor when false", async () => {
 
 #+begin_src js
 it("Less than executor when true", async () => {
-    const input = "1, 2, 3 lessThan! _";
+    const input = "1, 2 lessThan! _";
     const [ result ] = await interpretFile(input);
     expect(result).toBe(1);
 })
@@ -327,7 +327,7 @@ it("Less than executor when true", async () => {
 
 #+begin_src js
 it("Less than executor when false", async () => {
-    const input = "1, 2, 1 lessThan! _";
+    const input = "5, 2 lessThan! _";
     const [ result ] = await interpretFile(input);
     expect(result).toBe(0);
 })
@@ -398,4 +398,13 @@ it("Call a tape with a closure", async () => {
     const [ result ] = await interpretFile(input);
     expect(result).toBe(42);
 })
+#+end_src
+
+#+begin_src js
+it("Call a tape with a user-defined call executor", async () => {
+    const input = "a:(n)[ [ n ] ] _ _ _ 42, a! b:_ _ _ _ b! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(42);
+})
+
 #+end_src

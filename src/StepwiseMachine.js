@@ -7,7 +7,8 @@ import { assign } from "@xstate/immer";
 import {immerable} from "immer";
 import { Frame } from "./Frame";
 import { Category } from "concrete-parser";
-const MAX_STEPS = 100;
+import { service as callUserTapeExecutorService } from "./executors/callUserTape";
+const MAX_STEPS = 10000;
 // Preamble:1 ends here
 
 // Definition
@@ -563,6 +564,10 @@ export const config = {
 
 // Given the current block, return the executor service that matches it.
 
+// First, resolve the identifier to see where it points. If it points to a tape in the machine, then use our callUserTapeExecutorService. callUserTapeExecutorService takes an extra parameter in addition to the context, the resolved tape; this is for convenience, as otherwise it would have to resolve the same block again itself.
+
+// If it points to a global, then there must be an executor defined for that global.
+
 // Before returning, invoke the service creator with the current context. Because we are using Immer, the service won't be able to edit anything about the context.
 
 
@@ -570,7 +575,14 @@ export const config = {
     },
     services: {
         dispatchOnExecutor : (C, E) => {
-            const identifier = C.currentBlock.identifier
+            const block = Utils.resolveAndGet(C, C.currentBlock);
+
+            if (block && block.is(Category.Value, "Tape")) {
+                return callUserTapeExecutorService(C, block);
+            }
+
+            // Resolving went nowhere, so look for globals from current block.
+            const { identifier } = C.currentBlock;
             const executor = 
                   C.globalLabelsToExecutorServices[identifier];
 
@@ -667,12 +679,10 @@ export const Utils = {
         if (options.recurse) {
             block = Utils.getBlock(C, resolution);
 
-            if (block.is(Category.Value, "ValueIdentifier")) {
-                if (resolution.frameId !== frameId) {
-                    frame = Utils.getFrameById(C, resolution.frameId);
+            if (block && block.is(Category.Value, "ValueIdentifier")) {
+                frame = Utils.getFrameById(C, resolution.frameId);
 
-                    resolution = Utils.resolve(C, block, frame, options);
-                }
+                resolution = Utils.resolve(C, block, frame, options);
             }
         }
 
@@ -720,6 +730,7 @@ export const Utils = {
     getFrameById(C, id) {
         if (C.activeFrame.id == id) return C.activeFrame;
 
+        // ID's are unique, so order shouldn't matter.
         return C.stack.find((frame) => frame.id == id);
     },
 // Utils:6 ends here

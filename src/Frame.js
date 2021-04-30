@@ -12,7 +12,7 @@ export const Frame = (...args) => new _Frame(...args);
 class _Frame {
     constructor (id, tape, passedArguments = []) {
         this.id = id;
-        this.tape = tape;
+        this.tape = tape.shallowCopy();
         this.length = tape.cells.length;
         this.head = 0;
         this.halted = false;
@@ -79,6 +79,7 @@ class _Frame {
             else if (block.is(Category.Value, "AddressIdentifier")) {
                 const ourReference = this.references[block.identifier];
                 if (ourReference.type == "local" || ourReference.type == "param") {
+                    // TODO This is causing any address to be recorded in closeReferences, when really only address blocks which escape this frame should be recorded there, not just any address. How can we determine if something escapes the frame?
                     ourReference.captured = true;
                     block.frameId = this.id;
                 }

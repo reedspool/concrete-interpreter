@@ -11,6 +11,7 @@ import { assign } from "@xstate/immer";
 import {immerable} from "immer";
 import { Frame } from "./Frame";
 import { Category } from "concrete-parser";
+import { service as callUserTapeExecutorService } from "./executors/callUserTape";
 const MAX_STEPS = 10000;
 #+end_src
 
@@ -334,7 +335,6 @@ Either way, if the value is a ValueIdentifier, we have to resolve it to its prop
 Arguments list can never include ValueIdentifiers, so always resolve them to their true value.
 
 #+begin_src js
-
         appendArgumentsWithCurrentBlock : assign((C, E) => {
             let block = C.activeFrame.getBlockAtHead();
             if (block.is(Category.Value, "ValueIdentifier")) {
@@ -468,13 +468,24 @@ We need to check the category of the current block in order to branch execution.
 
 Given the current block, return the executor service that matches it.
 
+First, resolve the identifier to see where it points. If it points to a tape in the machine, then use our callUserTapeExecutorService. callUserTapeExecutorService takes an extra parameter in addition to the context, the resolved tape; this is for convenience, as otherwise it would have to resolve the same block again itself.
+
+If it points to a global, then there must be an executor defined for that global.
+
 Before returning, invoke the service creator with the current context. Because we are using Immer, the service won't be able to edit anything about the context.
 
 #+begin_src js
     },
     services: {
         dispatchOnExecutor : (C, E) => {
-            const identifier = C.currentBlock.identifier
+            const block = Utils.resolveAndGet(C, C.currentBlock);
+
+            if (block && block.is(Category.Value, "Tape")) {
+                return callUserTapeExecutorService(C, block);
+            }
+
+            // Resolving went nowhere, so look for globals from current block.
+            const { identifier } = C.currentBlock;
             const executor = 
                   C.globalLabelsToExecutorServices[identifier];
 
@@ -561,12 +572,10 @@ Sometimes we want just the location of the given block, and other times we want 
         if (options.recurse) {
             block = Utils.getBlock(C, resolution);
 
-            if (block.is(Category.Value, "ValueIdentifier")) {
-                if (resolution.frameId !== frameId) {
-                    frame = Utils.getFrameById(C, resolution.frameId);
+            if (block && block.is(Category.Value, "ValueIdentifier")) {
+                frame = Utils.getFrameById(C, resolution.frameId);
 
-                    resolution = Utils.resolve(C, block, frame, options);
-                }
+                resolution = Utils.resolve(C, block, frame, options);
             }
         }
 
@@ -605,6 +614,7 @@ Find a frame on the stack by its ID
     getFrameById(C, id) {
         if (C.activeFrame.id == id) return C.activeFrame;
 
+        // ID's are unique, so order shouldn't matter.
         return C.stack.find((frame) => frame.id == id);
     },
 #+end_src
