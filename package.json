@@ -4,7 +4,8 @@
   "version": "6.0.0",
   "main": "src/index.js",
   "scripts": {
-    "test": "jest --watchAll"
+    "test": "jest --watchAll",
+    "test-once": "jest"
   },
   "author": "",
   "license": "ISC",
