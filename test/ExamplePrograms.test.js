@@ -37,3 +37,36 @@ it("Example - Fibonacci", async () => {
     // expect(await interpretFile(input(9))).toEqual([ 55 ]);
 });
 // Fibonacci:1 ends here
+
+// FizzBuzz
+
+
+// [[file:../literate/ExampleProgramTests.org::*FizzBuzz][FizzBuzz:1]]
+it.skip("Example - FizzBuzz", async () => {
+    const input = (n) => `
+        n: ${n}
+        i: 0
+
+        start:
+          i, n = _, @end jump!
+          i, 1 + _, @i set!
+
+        i, 3 % _ ~ fizz: _
+        i, 5 % _ ~ buzz: _
+        fizz, buzz & fizzbuzz: _
+
+        fizzbuzz, @fb jump!
+        fizz, @f jump!
+        buzz, @b jump!
+
+        i print! @start jump!
+        fb: "FizzBuzz" print! @start jump!
+        f: "Fizz" print! @start jump!
+        b: "Buzz" print! @start jump!
+
+        end:_
+        `;
+
+    expect(await interpretFile(input(100))).toEqual([ 1 ]);
+});
+// FizzBuzz:1 ends here
