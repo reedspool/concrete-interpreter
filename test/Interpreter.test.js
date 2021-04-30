@@ -422,6 +422,33 @@ it("Or executor when false", async () => {
 })
 // Or executor:3 ends here
 
+// Not executor
+
+
+// [[file:../literate/InterpreterTests.org::*Not executor][Not executor:1]]
+it("Not executor when true", async () => {
+    const input = "0 not! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+// Not executor:1 ends here
+
+// [[file:../literate/InterpreterTests.org::*Not executor][Not executor:2]]
+it("Not operator executor when true", async () => {
+    const input = "0 ~ _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+// Not executor:2 ends here
+
+// [[file:../literate/InterpreterTests.org::*Not executor][Not executor:3]]
+it("Not executor when false", async () => {
+    const input = "42 not! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(0);
+})
+// Not executor:3 ends here
+
 // Less Than Executor
 
 

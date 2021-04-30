@@ -404,6 +404,32 @@ it("Or executor when false", async () => {
 })
 #+end_src
 
+* Not executor
+
+#+begin_src js
+it("Not executor when true", async () => {
+    const input = "0 not! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
+it("Not operator executor when true", async () => {
+    const input = "0 ~ _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(1);
+})
+#+end_src
+
+#+begin_src js
+it("Not executor when false", async () => {
+    const input = "42 not! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(0);
+})
+#+end_src
+
 * Less Than Executor
 
 #+begin_src js

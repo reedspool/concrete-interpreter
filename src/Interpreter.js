@@ -141,6 +141,8 @@ export const interpretFile = async (source) => {
         { label: "<", service: createExecutor((a, b) => a < b, (n) => n ? 1 : 0) },
         { label: "greaterThan", service: createExecutor((a, b) => a > b, (n) => n ? 1 : 0) },
         { label: ">", service: createExecutor((a, b) => a > b, (n) => n ? 1 : 0) },
+        { label: "not", service: createExecutor((a) => a, (n) => n == 0 ? 1 : 0) },
+        { label: "~", service: createExecutor((a) => a, (n) => n == 0 ? 1 : 0) },
     ].forEach(
         ({ label, service }) => runInterpreter.send(
             { type: "LOAD_GLOBAL_LABEL", label, service }));
