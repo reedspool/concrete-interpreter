@@ -17,26 +17,26 @@ import { interpretFile } from "../src/Interpreter";
 it("Example - Fibonacci", async () => {
     const input = (n) => `
         fib: (n)[
-            n, 1 greaterThan! _, @recurse jump! 1 return!
+            n, 1 > _, @recurse jump! 1 return!
 
             recurse:_
 
-            n, 1 subtract! _, fib call! a: _
-            n, 2 subtract! _, fib call! b: _
+            n, 1 - _, fib! a: _
+            n, 2 - _, fib! b: _
 
-            a, b add! _
+            a, b + _
         ]
 
-        ${n}, fib call! _
+        ${n}, fib! _
         `;
 
-    // expect(await interpretFile(input(0))).toEqual([ 1 ]);
-    // expect(await interpretFile(input(1))).toEqual([ 1 ]);
-    // expect(await interpretFile(input(2))).toEqual([ 2 ]);
-    // expect(await interpretFile(input(3))).toEqual([ 3 ]);
-    // expect(await interpretFile(input(4))).toEqual([ 5 ]);
-    // expect(await interpretFile(input(5))).toEqual([ 8 ]);
-    // expect(await interpretFile(input(6))).toEqual([ 13 ]);
+    expect(await interpretFile(input(0))).toEqual([ 1 ]);
+    expect(await interpretFile(input(1))).toEqual([ 1 ]);
+    expect(await interpretFile(input(2))).toEqual([ 2 ]);
+    expect(await interpretFile(input(3))).toEqual([ 3 ]);
+    expect(await interpretFile(input(4))).toEqual([ 5 ]);
+    expect(await interpretFile(input(5))).toEqual([ 8 ]);
+    expect(await interpretFile(input(6))).toEqual([ 13 ]);
     // expect(await interpretFile(input(7))).toEqual([ 21 ]);
     // expect(await interpretFile(input(8))).toEqual([ 34 ]);
     // expect(await interpretFile(input(9))).toEqual([ 55 ]);
