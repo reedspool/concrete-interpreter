@@ -121,6 +121,8 @@ export const interpretFile = async (source) => {
         { label: "*", service: createExecutor((a, b) => a * b) },
         { label: "divide", service: createExecutor((a, b) => a / b) },
         { label: "/", service: createExecutor((a, b) => a / b) },
+        { label: "modulus", service: createExecutor((a, b) => a % b) },
+        { label: "%", service: createExecutor((a, b) => a % b) },
 // Interpret File:8 ends here
 
 

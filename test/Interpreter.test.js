@@ -221,6 +221,41 @@ it("Divide by zero is JS Infinity", async () => {
 })
 // Divide executor:4 ends here
 
+// Modulus executor
+
+
+// [[file:../literate/InterpreterTests.org::*Modulus executor][Modulus executor:1]]
+it("Modulus executor when result is integer", async () => {
+    const input = "10, 2 modulus! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(0);
+})
+// Modulus executor:1 ends here
+
+// [[file:../literate/InterpreterTests.org::*Modulus executor][Modulus executor:2]]
+it("Modulus executor when result is infinite decimal", async () => {
+    const input = "10, 3 modulus! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(10 % 3);
+})
+// Modulus executor:2 ends here
+
+// [[file:../literate/InterpreterTests.org::*Modulus executor][Modulus executor:3]]
+it("Modulus operator executor when result is infinite decimal", async () => {
+    const input = "10, 3 % 1";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(10 % 3);
+})
+// Modulus executor:3 ends here
+
+// [[file:../literate/InterpreterTests.org::*Modulus executor][Modulus executor:4]]
+it("Modulus by zero is JS Infinity", async () => {
+    const input = "10, 0 modulus! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(NaN);
+})
+// Modulus executor:4 ends here
+
 // Basic labels
 
 
@@ -501,6 +536,14 @@ it("Call a tape with a user-defined call executor", async () => {
 // Call a tape executor:7 ends here
 
 // Rename a global executor
+// [[file:../literate/InterpreterTests.org::*Call a tape executor][Call a tape executor:8]]
+it("Call a tape with a user-defined operator call executor", async () => {
+    const input = "=>:(n)[ [ n ] ] _ _ _ 42, => b:_ _ _ _ b! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(42);
+})
+// Call a tape executor:8 ends here
+
 
 
 // [[file:../literate/InterpreterTests.org::*Rename a global executor][Rename a global executor:1]]

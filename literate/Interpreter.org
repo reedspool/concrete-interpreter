@@ -103,6 +103,8 @@ A lot of binary, algebraic operators in JS are very similar in their constructio
         { label: "*", service: createExecutor((a, b) => a * b) },
         { label: "divide", service: createExecutor((a, b) => a / b) },
         { label: "/", service: createExecutor((a, b) => a / b) },
+        { label: "modulus", service: createExecutor((a, b) => a % b) },
+        { label: "%", service: createExecutor((a, b) => a % b) },
 #+end_src
 
 Zero is the only false-y value in Concrete. There are no proper boolean values (yet). For all operators which return booleans, convert them to either a 1 or 0.
