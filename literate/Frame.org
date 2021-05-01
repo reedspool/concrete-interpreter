@@ -12,7 +12,6 @@ class _Frame {
     constructor (id, tape, passedArguments = []) {
         this.id = id;
         this.tape = tape.shallowCopy();
-        this.length = tape.cells.length;
         this.head = 0;
         this.halted = false;
         this.arguments = [];
@@ -104,7 +103,7 @@ At a frame's end of life, all captured references become closed references. Clos
 
 #+begin_src js
 
-    isBeyondEdge() { return this.head >= this.length; }
+    isBeyondEdge() { return this.head >= this.tape.cells.length; }
 
     advance() { this.head++; }
 

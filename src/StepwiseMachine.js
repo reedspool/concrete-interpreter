@@ -115,6 +115,15 @@ export const definition = {
                     on : {
                         STEP: [
                             {
+                                cond: "isCurrentBlockInlineTapeAndCommaAtHead",
+                                actions: [ "clearArguments" ],
+                                target: "executeInlineTape"
+                            },
+                            {
+                                cond: "isCurrentBlockInlineTape",
+                                target: "executeInlineTape"
+                            },
+                            {
                                 cond: "isCurrentBlockValue",
                                 target: "executeValue"
                             },
@@ -133,10 +142,22 @@ export const definition = {
 
 
 
-// Ops act on their arguments, or the tape around them. They are the blocks which /do/ things. What happens depends on the block itself, so we have to dispatch based on that block to a variety of executors.
+// Inline tapes are like normal tapes, but they immediately execute, and their result goes immediately into the originating frame's arguments. This is similar to parentheses in algebraic languages. This state handles executing the tape, but where the result goes depends on pop.
 
 
 // [[file:../literate/StepwiseMachine.org::*Definition][Definition:7]]
+                executeInlineTape : {
+                    entry: "callInlineTape",
+                    always: "no_advance"
+                },
+// Definition:7 ends here
+
+
+
+// Ops act on their arguments, or the tape around them. They are the blocks which /do/ things. What happens depends on the block itself, so we have to dispatch based on that block to a variety of executors.
+
+
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:8]]
                 executeOp: {
                     invoke: {
                         id : "executor",
@@ -152,7 +173,7 @@ export const definition = {
                             actions: [ "clearArguments" ]
                         }
                     },
-// Definition:7 ends here
+// Definition:8 ends here
 
 
 
@@ -161,7 +182,7 @@ export const definition = {
 // This first important action is a way to replicate the "onDone" above for those services which do not finalize themselves, like callback services.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:8]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:9]]
                     on: {
                         DONE: { target: "advance", actions: [ "clearArguments" ] },
                         DONE_NO_ADVANCE: { target: "no_advance" },
@@ -174,14 +195,14 @@ export const definition = {
                         REQUEST_BLOCK_AT_ADDRESS : { actions: [ "exec_reqBlockAtAddress" ] },
                     }
                 },
-// Definition:8 ends here
+// Definition:9 ends here
 
 
 
 // If there is a comma preceding the current block, we grow the argument list by appending the current block. If there is no comma, the argument list will only contain the current block, dumping its previous contents.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:9]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:10]]
                 executeValue: {
                     entry: [ "reportReadyToStep" ],
                     on : {
@@ -198,7 +219,7 @@ export const definition = {
                         ]
                     }
                 },
-// Definition:9 ends here
+// Definition:10 ends here
 
 
 
@@ -207,7 +228,7 @@ export const definition = {
 // After advancing, we go "back to the top" in the read-eval-advance cycle, first checking if we've moved past the edge of the tape and must halt.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:10]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:11]]
                 advance: {
                     entry: [ "reportReadyToStep" ],
                     on : {
@@ -217,14 +238,14 @@ export const definition = {
                         }
                     }
                 },
-// Definition:10 ends here
+// Definition:11 ends here
 
 
 
 // For those executors which do not advance the head, we still want the step machine to act the same way, so make the same exact state but which does not advance.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:11]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:12]]
                 no_advance: {
                     entry: [ "reportReadyToStep" ],
                     on : {
@@ -233,31 +254,38 @@ export const definition = {
                         }
                     }
                 },
-// Definition:11 ends here
+// Definition:12 ends here
 
 
 
 // The machine enters the "return" state when a called tape is complete. If the tape has a result, place it where results go. Usually, this is immediately to the right of the call identifier which spawned the tape.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:12]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:13]]
                 "return" : {
                     entry: [ "reportReadyToStep" ],
                     on : {
-                        STEP: {
-                            target: "pop",
-                            actions: [ "placeResultOnLowerFrame" ]
-                        }
+                        STEP: [
+                            {
+                                cond: "isCurrentTapeInline",
+                                target: "pop",
+                                actions: [ "appendArgumentsOnLowerFrame" ]
+                            },
+                            {
+                                target: "pop",
+                                actions: [ "placeResultOnLowerFrame" ]
+                            }
+                        ]
                     }
                 },
-// Definition:12 ends here
+// Definition:13 ends here
 
 
 
 // Pop merely disposes of the current frame and replaces it with the frame on top of the stack. Then, it starts back at the top of the loop by checking past the edge for the old frame.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:13]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:14]]
                 pop : {
                     entry: [ "reportReadyToStep" ],
                     on : {
@@ -267,17 +295,17 @@ export const definition = {
                         }
                     }
                 }
-// Definition:13 ends here
+// Definition:14 ends here
 
 
 
 // Closing "run" internal states map as well as itself.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:14]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:15]]
             }
         },
-// Definition:14 ends here
+// Definition:15 ends here
 
 
 
@@ -286,13 +314,13 @@ export const definition = {
 // When the program is halted, the result of the program is the current arguments list in the active frame.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:15]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:16]]
         halted: {
             type : "final",
             entry : [ "haltFrame" ],
             data : (C) => ({ results: C.activeFrame.arguments })
         },
-// Definition:15 ends here
+// Definition:16 ends here
 
 
 
@@ -303,22 +331,22 @@ export const definition = {
 // We include the full context of the machine for debugging purposes.
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:16]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:17]]
         error: {
             type : "final",
             entry : [ "haltFrame" ],
             data : (C, E) => ({ error: E, context: C })
         },
-// Definition:16 ends here
+// Definition:17 ends here
 
 
 
 // We're done with states, so close the state map:
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:17]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:18]]
     },
-// Definition:17 ends here
+// Definition:18 ends here
 
 
 
@@ -326,9 +354,9 @@ export const definition = {
 // And finally, close up the definition:
 
 
-// [[file:../literate/StepwiseMachine.org::*Definition][Definition:18]]
+// [[file:../literate/StepwiseMachine.org::*Definition][Definition:19]]
 };
-// Definition:18 ends here
+// Definition:19 ends here
 
 // Configuration
 
@@ -506,13 +534,35 @@ export const config = {
 
 
 
-// There are a huge number of actions that op block executors can take in the course of their invocation. They are all prefixed with `exec_`.
+// Much like how we place a result on a lower frame, inline tape results go into the arguments of the lower frame.
+
+// Unlike normal adding to arguments, we don't check whether there is a comma, and whether we should clear the arguments list. Instead, this happens before we call the inline tape, elsewhere.
+
+// Unlike normal tapes, inline tapes must have a result.
 
 
 // [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:14]]
+        appendArgumentsOnLowerFrame : assign((C, E) => {
+            const [ block ] = C.activeFrame.arguments;
+            if (! block) throw new Error("Inline tape did not return a result");
+
+            if (block.is(Category.Value, "ValueIdentifier")) {
+                block = Utils.resolveAndGet(C, block);
+            }
+            const lastFrame = C.stack[C.stack.length - 1];
+            lastFrame.appendBlockToArguments(block);
+        }),
+// Configuration:14 ends here
+
+
+
+// There are a huge number of actions that op block executors can take in the course of their invocation. They are all prefixed with `exec_`.
+
+
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:15]]
         exec_callTape: assign((C, E) => {
             C.stack.push(C.activeFrame);
-            C.activeFrame = Frame(C.nextFrameId++, E.tape, E.arguments, C.activeFrame);
+            C.activeFrame = Frame(C.nextFrameId++, E.tape, E.arguments);
         }),
         exec_placeResult: assign((C, E) => {
             C.activeFrame.placeResult(E.block);
@@ -527,38 +577,53 @@ export const config = {
         exec_moveHeadToAddress : assign((C, E) => {
             C.activeFrame.moveHeadToLabel(E.address.identifier);
         }),
-// Configuration:14 ends here
+// Configuration:15 ends here
+
+
+
+// Calling an inline tape is a lot like another tape, but there's no args.
+
+
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:16]]
+        callInlineTape: assign((C, E) => {
+            C.stack.push(C.activeFrame);
+            C.activeFrame = Frame(C.nextFrameId++, C.currentBlock, []);
+        }),
+// Configuration:16 ends here
 
 
 
 // Done with actions, now onto guards. Note guards appear in the above machine in "cond" fields. See XState docs for more.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:15]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:17]]
     },
     guards: {
-// Configuration:15 ends here
+// Configuration:17 ends here
 
 
 
 // Many guards are obvious from the perspective of the machine, we just defer them to other objects.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:16]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:18]]
         isBeyondEdge : (C, E) => C.activeFrame.isBeyondEdge(),
         isBeyondEdgeAndStackIsNonEmpty : (C, E) => C.activeFrame.isBeyondEdge() && C.stack.length > 0,
         isCommaAtHead : (C, E) => C.activeFrame.isCommaAtHead(),
-// Configuration:16 ends here
+// Configuration:18 ends here
 
 
 
 // We need to check the category of the current block in order to branch execution.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:17]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:19]]
         isCurrentBlockValue : (C, E) => C.currentBlock.is(Category.Value),
+        isCurrentBlockInlineTape : (C, E) => C.currentBlock.is(Category.Value, "Tape") && C.currentBlock.isInline,
+        isCurrentBlockInlineTapeAndCommaAtHead : (C, E) => C.currentBlock.is(Category.Value, "Tape") && C.currentBlock.isInline && C.activeFrame.isCommaAtHead(),
         isCurrentBlockOp : (C, E) => C.currentBlock.is(Category.Op),
-// Configuration:17 ends here
+        isCurrentTapeInline: (C, E) => C.activeFrame.tape.isInline,
+// Configuration:19 ends here
 
 
 
@@ -571,7 +636,7 @@ export const config = {
 // Before returning, invoke the service creator with the current context. Because we are using Immer, the service won't be able to edit anything about the context.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:18]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:20]]
     },
     services: {
         dispatchOnExecutor : (C, E) => {
@@ -590,17 +655,17 @@ export const config = {
 
             return executor(C);
         }
-// Configuration:18 ends here
+// Configuration:20 ends here
 
 
 
 // Close final config map.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:19]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:21]]
     }
 }
-// Configuration:19 ends here
+// Configuration:21 ends here
 
 // Utils
 

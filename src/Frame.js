@@ -13,7 +13,6 @@ class _Frame {
     constructor (id, tape, passedArguments = []) {
         this.id = id;
         this.tape = tape.shallowCopy();
-        this.length = tape.cells.length;
         this.head = 0;
         this.halted = false;
         this.arguments = [];
@@ -113,7 +112,7 @@ class _Frame {
 // No heading:5 ends here
 
 // [[file:../literate/Frame.org::+begin_src js][No heading:6]]
-    isBeyondEdge() { return this.head >= this.length; }
+    isBeyondEdge() { return this.head >= this.tape.cells.length; }
 
     advance() { this.head++; }
 

@@ -547,10 +547,19 @@ it("Call a tape with a user-defined operator call executor", async () => {
 })
 #+end_src
 
-* Rename a global executor
+* Inline tapes
+#+begin_src js
+it("Simple Inline tape", async () => {
+    const input = "{ 1, 2 + _ }, 4 + _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(7);
+})
+#+end_src
+
+* Aliasing blocks
 
 #+begin_src js
-it("Renaming a global executor still works", async () => {
+it.skip("Alias a global executor still works", async () => {
     const input = "abcd: greaterThan 1, 2 abcd! _";
     const [ result ] = await interpretFile(input);
     expect(result).toBe(0);

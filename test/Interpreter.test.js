@@ -562,7 +562,6 @@ it("Call a tape with a user-defined call executor", async () => {
 })
 // Call a tape executor:7 ends here
 
-// Rename a global executor
 // [[file:../literate/InterpreterTests.org::*Call a tape executor][Call a tape executor:8]]
 it("Call a tape with a user-defined operator call executor", async () => {
     const input = "=>:(n)[ [ n ] ] _ _ _ 42, => b:_ _ _ _ b! _";
@@ -571,12 +570,23 @@ it("Call a tape with a user-defined operator call executor", async () => {
 })
 // Call a tape executor:8 ends here
 
+// Inline tapes
+
+// [[file:../literate/InterpreterTests.org::*Inline tapes][Inline tapes:1]]
+it("Simple Inline tape", async () => {
+    const input = "{ 1, 2 + _ }, 4 + _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(7);
+})
+// Inline tapes:1 ends here
+
+// Aliasing blocks
 
 
-// [[file:../literate/InterpreterTests.org::*Rename a global executor][Rename a global executor:1]]
-it("Renaming a global executor still works", async () => {
+// [[file:../literate/InterpreterTests.org::*Aliasing blocks][Aliasing blocks:1]]
+it.skip("Alias a global executor still works", async () => {
     const input = "abcd: greaterThan 1, 2 abcd! _";
     const [ result ] = await interpretFile(input);
     expect(result).toBe(0);
 })
-// Rename a global executor:1 ends here
+// Aliasing blocks:1 ends here

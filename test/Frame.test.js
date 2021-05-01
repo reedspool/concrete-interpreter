@@ -15,7 +15,6 @@ it("Can be instantiated", async () => {
     const frame = Frame(0, tree.tape);
     expect(frame).toBeDefined();
     expect(frame.tape).toBeDefined();
-    expect(frame.length).toBe(3);
     expect(frame.head).toBe(0);
     expect(frame.halted).toBe(false);
     expect(frame.getBlockAtHead().is(Category.Value))

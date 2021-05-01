@@ -103,6 +103,15 @@ Upon proceeding, we branch depending on the category of that block.
                     on : {
                         STEP: [
                             {
+                                cond: "isCurrentBlockInlineTapeAndCommaAtHead",
+                                actions: [ "clearArguments" ],
+                                target: "executeInlineTape"
+                            },
+                            {
+                                cond: "isCurrentBlockInlineTape",
+                                target: "executeInlineTape"
+                            },
+                            {
                                 cond: "isCurrentBlockValue",
                                 target: "executeValue"
                             },
@@ -116,6 +125,15 @@ Upon proceeding, we branch depending on the category of that block.
                             }
                         ]
                     }
+                },
+#+end_src
+
+Inline tapes are like normal tapes, but they immediately execute, and their result goes immediately into the originating frame's arguments. This is similar to parentheses in algebraic languages. This state handles executing the tape, but where the result goes depends on pop.
+
+#+begin_src js
+                executeInlineTape : {
+                    entry: "callInlineTape",
+                    always: "no_advance"
                 },
 #+end_src
 
@@ -214,10 +232,17 @@ The machine enters the "return" state when a called tape is complete. If the tap
                 "return" : {
                     entry: [ "reportReadyToStep" ],
                     on : {
-                        STEP: {
-                            target: "pop",
-                            actions: [ "placeResultOnLowerFrame" ]
-                        }
+                        STEP: [
+                            {
+                                cond: "isCurrentTapeInline",
+                                target: "pop",
+                                actions: [ "appendArgumentsOnLowerFrame" ]
+                            },
+                            {
+                                target: "pop",
+                                actions: [ "placeResultOnLowerFrame" ]
+                            }
+                        ]
                     }
                 },
 #+end_src
@@ -422,12 +447,31 @@ If the arguments list is empty, do nothing.
         }),
 #+end_src
 
+Much like how we place a result on a lower frame, inline tape results go into the arguments of the lower frame.
+
+Unlike normal adding to arguments, we don't check whether there is a comma, and whether we should clear the arguments list. Instead, this happens before we call the inline tape, elsewhere.
+
+Unlike normal tapes, inline tapes must have a result.
+
+#+begin_src js
+        appendArgumentsOnLowerFrame : assign((C, E) => {
+            const [ block ] = C.activeFrame.arguments;
+            if (! block) throw new Error("Inline tape did not return a result");
+
+            if (block.is(Category.Value, "ValueIdentifier")) {
+                block = Utils.resolveAndGet(C, block);
+            }
+            const lastFrame = C.stack[C.stack.length - 1];
+            lastFrame.appendBlockToArguments(block);
+        }),
+#+end_src
+
 There are a huge number of actions that op block executors can take in the course of their invocation. They are all prefixed with `exec_`.
 
 #+begin_src js
         exec_callTape: assign((C, E) => {
             C.stack.push(C.activeFrame);
-            C.activeFrame = Frame(C.nextFrameId++, E.tape, E.arguments, C.activeFrame);
+            C.activeFrame = Frame(C.nextFrameId++, E.tape, E.arguments);
         }),
         exec_placeResult: assign((C, E) => {
             C.activeFrame.placeResult(E.block);
@@ -441,6 +485,15 @@ There are a huge number of actions that op block executors can take in the cours
         }),
         exec_moveHeadToAddress : assign((C, E) => {
             C.activeFrame.moveHeadToLabel(E.address.identifier);
+        }),
+#+end_src
+
+Calling an inline tape is a lot like another tape, but there's no args.
+
+#+begin_src js
+        callInlineTape: assign((C, E) => {
+            C.stack.push(C.activeFrame);
+            C.activeFrame = Frame(C.nextFrameId++, C.currentBlock, []);
         }),
 #+end_src
 
@@ -463,7 +516,10 @@ We need to check the category of the current block in order to branch execution.
 
 #+begin_src js
         isCurrentBlockValue : (C, E) => C.currentBlock.is(Category.Value),
+        isCurrentBlockInlineTape : (C, E) => C.currentBlock.is(Category.Value, "Tape") && C.currentBlock.isInline,
+        isCurrentBlockInlineTapeAndCommaAtHead : (C, E) => C.currentBlock.is(Category.Value, "Tape") && C.currentBlock.isInline && C.activeFrame.isCommaAtHead(),
         isCurrentBlockOp : (C, E) => C.currentBlock.is(Category.Op),
+        isCurrentTapeInline: (C, E) => C.activeFrame.tape.isInline,
 #+end_src
 
 Given the current block, return the executor service that matches it.
