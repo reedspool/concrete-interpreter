@@ -1,0 +1,8 @@
+#+TITLE: Index File (Entry for NPM Module)
+#+PROPERTY: header-args    :comments both :tangle ../src/index.js
+
+This file will be the entry point for this module. All it does is expose, i.e. export, every function which should be public.
+
+#+begin_src js
+export { interpretFile } from "./Interpreter";
+#+end_src

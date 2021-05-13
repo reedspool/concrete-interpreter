@@ -1,0 +1,18 @@
+#+TITLE: Index Tests
+#+PROPERTY: header-args    :comments both :tangle ../test/index.test.js
+
+* Preamble
+
+#+begin_src js
+import { interpretFile } from "../src/index";
+import * as Interpreter from "../src/Interpreter";
+#+end_src
+
+* Tests
+
+#+begin_src js
+it("Exposes everything it needs to.", () => {
+    expect(interpretFile).toBeDefined();
+    expect(interpretFile).toBe(Interpreter.interpretFile);
+})
+#+end_src
