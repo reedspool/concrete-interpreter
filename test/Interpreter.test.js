@@ -302,6 +302,22 @@ it("Set value at address then get it", async () => {
 })
 // Basic get and set executors:3 ends here
 
+// [[file:../literate/InterpreterTests.org::*Basic get and set executors][Basic get and set executors:4]]
+it("Infix set into an address", async () => {
+    const input = "5 -> @result result: _ @result get! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+// Basic get and set executors:4 ends here
+
+// [[file:../literate/InterpreterTests.org::*Basic get and set executors][Basic get and set executors:5]]
+it("Infix set into a value identifier", async () => {
+    const input = "42 -> result result: _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(42);
+})
+// Basic get and set executors:5 ends here
+
 // Conditional and not conditional jumps
 
 // Jump into an argument list to an operator to prove that it actually jumped.
@@ -569,6 +585,16 @@ it("Call a tape with a user-defined operator call executor", async () => {
     expect(result).toBe(42);
 })
 // Call a tape executor:8 ends here
+
+// Reference closures
+
+// [[file:../literate/InterpreterTests.org::*Reference closures][Reference closures:1]]
+it("Call an empty tape has no effect", async () => {
+    const input = "[ ] call! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(null);
+})
+// Reference closures:1 ends here
 
 // Inline tapes
 

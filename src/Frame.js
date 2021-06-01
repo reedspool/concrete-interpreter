@@ -118,9 +118,13 @@ class _Frame {
 
     halt() { this.halted = true; }
 
-    getBlockAtHead() { return this.tape.cells[this.head]; }
+    getBlockAtHead() { return this.getBlockAt(this.head); }
 
-    isCommaAtHead() { return this.tape.commas[this.head]; }
+    getBlockAt(index) { return this.tape.cells[index]; }
+
+    isCommaAt(index) { return this.tape.commas[index]; }
+
+    isCommaAtHead() { return this.isCommaAt(this.head); }
 
     placeResult(block) { this.tape.cells[this.head + 1] = block; }
 

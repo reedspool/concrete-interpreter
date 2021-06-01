@@ -294,6 +294,22 @@ it("Set value at address then get it", async () => {
 })
 #+end_src
 
+#+begin_src js
+it("Infix set into an address", async () => {
+    const input = "5 -> @result result: _ @result get! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+#+end_src
+
+#+begin_src js
+it("Infix set into a value identifier", async () => {
+    const input = "42 -> result result: _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(42);
+})
+#+end_src
+
 * Conditional and not conditional jumps
 
 Jump into an argument list to an operator to prove that it actually jumped.
@@ -547,6 +563,14 @@ it("Call a tape with a user-defined operator call executor", async () => {
 })
 #+end_src
 
+* Reference closures
+#+begin_src js
+it("Call an empty tape has no effect", async () => {
+    const input = "[ ] call! _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(null);
+})
+#+end_src
 * Inline tapes
 #+begin_src js
 it("Simple Inline tape", async () => {
