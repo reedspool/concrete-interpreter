@@ -16,22 +16,22 @@ export const service = (C) => (sendParent, receiveParent) => {
     // If there is only one argument, then it is unconditional.
     if (! address) {
         address = block;
-        
+
         sendParent({ type: "MOVE_HEAD_TO_ADDRESS", address });
         sendParent({ type: "CLEAR_ARGUMENTS" });
         sendParent("DONE_NO_ADVANCE");
         return;
 
     }
-    
+
     // Otherwise it is conditional and we must test the condition
-    // Right now, zero is the only value in Concrete which is falsy
-    // Do not jump in that case, and the step interpreter should proceed as normal in that case.
-    if (block.asJS() === 0) {
+    // Do not jump if this block is falsey, and the step interpreter should
+    // proceed as normal in that case.
+    if (! block.truthy()) {
         sendParent("DONE");
         return;
     }
-        
+
     // Otherwise jump in the exact same way as an unconditional jump
     sendParent({ type: "MOVE_HEAD_TO_ADDRESS", address });
     sendParent({ type: "CLEAR_ARGUMENTS" });

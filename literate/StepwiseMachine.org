@@ -130,10 +130,24 @@ Upon proceeding, we branch depending on the category of that block.
 
 Inline tapes are like normal tapes, but they immediately execute, and their result goes immediately into the originating frame's arguments. This is similar to parentheses in algebraic languages. This state handles executing the tape, but where the result goes depends on pop.
 
+Just like when we execute a normal value, if there is a comma preceding the current block, we grow the argument list by appending the current block. If there is no comma, the argument list will only contain the current block, dumping its previous contents.
+
 #+begin_src js
                 executeInlineTape : {
+                    always: [
+                         {
+                             cond: "isCommaAtHead",
+                             target: "callInlineTape",
+                         },
+                         {
+                             target: "callInlineTape",
+                             actions: [ "clearArguments" ]
+                         }
+                    ]
+                },
+                callInlineTape : {
+                    always: "no_advance",
                     entry: "callInlineTape",
-                    always: "no_advance"
                 },
 #+end_src
 
@@ -165,6 +179,7 @@ This first important action is a way to replicate the "onDone" above for those s
                     on: {
                         DONE: { target: "advance", actions: [ "clearArguments" ] },
                         DONE_NO_ADVANCE: { target: "no_advance" },
+                        DONE_SKIP_NEXT_BLOCK: { target: "no_advance", actions: [ "exec_skipNextBlock" ] },
                         EXPLICIT_RETURN: { target: "return" },
                         CLEAR_ARGUMENTS: { actions: [ "clearArguments" ] },
                         CALL_TAPE : { actions: [ "exec_callTape" ] },
@@ -451,12 +466,10 @@ Much like how we place a result on a lower frame, inline tape results go into th
 
 Unlike normal adding to arguments, we don't check whether there is a comma, and whether we should clear the arguments list. Instead, this happens before we call the inline tape, elsewhere.
 
-Unlike normal tapes, inline tapes must have a result.
-
 #+begin_src js
         appendArgumentsOnLowerFrame : assign((C, E) => {
             const [ block ] = C.activeFrame.arguments;
-            if (! block) throw new Error("Inline tape did not return a result");
+            if (! block || block.is(Category.Value, "Blank")) return;
 
             if (block.is(Category.Value, "ValueIdentifier")) {
                 block = Utils.resolveAndGet(C, block);
@@ -481,10 +494,14 @@ There are a huge number of actions that op block executors can take in the cours
             return { type : "RESPONSE_EXECUTOR", block };
         }, { to: "executor" }),
         exec_placeBlockAtAddress : assign((C, E) => {
-            C.activeFrame.setBlockByLabel(E.address.identifier, E.block);
+            Utils.resolveAndSet(C, E.address, E.block);
         }),
         exec_moveHeadToAddress : assign((C, E) => {
             C.activeFrame.moveHeadToLabel(E.address.identifier);
+        }),
+        exec_skipNextBlock : assign((C, E) => {
+            // Two because normally we would advance
+            C.activeFrame.moveHeadN(2);
         }),
 #+end_src
 
@@ -656,11 +673,34 @@ Get an actual block given a resolution.
     },
 #+end_src
 
+Ditto to set a block.
+
+#+begin_src js
+    setBlock(C, { type, label, frameId }, block) {
+        if (type == "closed") {
+            C.deadFrameIdsToLabelsToClosedCells[frameId][label] = block;
+            return;
+        }
+        else if (type == "stack") {
+            const frame = Utils.getFrameById(C, frameId);
+
+            frame.setBlockByLabel(label, block);
+            return;
+        }
+
+        throw new Error(`Unable to set block for resolution ${type}-${label}-${frameId}`)
+    },
+#+end_src
+
 Further utilities using the above.
 
 #+begin_src js
-    resolveAndGet(C, block) {
-        return Utils.getBlock(C, Utils.resolve(C, block, C.activeFrame));
+    resolveAndGet(C, identifier) {
+        return Utils.getBlock(C, Utils.resolve(C, identifier, C.activeFrame));
+    },
+
+    resolveAndSet(C, identifier, block) {
+        return Utils.setBlock(C, Utils.resolve(C, identifier, C.activeFrame), block);
     },
 #+end_src
 

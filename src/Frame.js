@@ -132,6 +132,8 @@ class _Frame {
 
     moveHeadToLabel(label) { this.head = this.tape.getIndexOfLabel(label); }
 
+    moveHeadN(n) { this.head += n; }
+
     getBlockByLabel(label) {
         const { type, index } = this.tape.references[label];
 

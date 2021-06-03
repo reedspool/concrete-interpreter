@@ -10,6 +10,7 @@ import { create as createExecutor } from "./executors/AlgebraicExecutorFactory";
 import { service as getExecutorService } from "./executors/get";
 import { service as setExecutorService } from "./executors/set";
 import { service as setInfixExecutorService } from "./executors/setInfix";
+import { service as ifExecutorService } from "./executors/if";
 import { service as jumpExecutorService } from "./executors/jump";
 import { service as callExecutorService } from "./executors/call";
 import { service as printExecutorService } from "./executors/print";
@@ -102,6 +103,7 @@ export const interpretFile = async (source) => {
         { label: "get", service: getExecutorService },
         { label: "set", service: setExecutorService },
         { label: "->", service: setInfixExecutorService },
+        { label: "if", service: ifExecutorService },
         { label: "jump", service: jumpExecutorService },
         { label: "call", service: callExecutorService },
         { label: "print", service: printExecutorService },

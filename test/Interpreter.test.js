@@ -357,6 +357,25 @@ it("Conditional jump with falsy conditional doesn't jump", async () => {
 })
 // Conditional and not conditional jumps:3 ends here
 
+// If
+
+
+// [[file:../literate/InterpreterTests.org::*If][If:1]]
+it("True if", async () => {
+    const input = "1 if! { 5, @a set! } a: 4";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+// If:1 ends here
+
+// [[file:../literate/InterpreterTests.org::*If][If:2]]
+it("false if", async () => {
+    const input = "0 if! { 5, @a set! } a: 4";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(4);
+})
+// If:2 ends here
+
 // Equal executor
 
 
@@ -586,6 +605,22 @@ it("Call a tape with a user-defined operator call executor", async () => {
 })
 // Call a tape executor:8 ends here
 
+// [[file:../literate/InterpreterTests.org::*Call a tape executor][Call a tape executor:9]]
+it("Call a tape which sets a value outside its scope", async () => {
+    const input = "a: 5 [ 10, @a set! ] call! a, a * _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(100);
+})
+// Call a tape executor:9 ends here
+
+// [[file:../literate/InterpreterTests.org::*Call a tape executor][Call a tape executor:10]]
+it("Call a tape which references a value outside its scope", async () => {
+    const input = "a: 5 [ a, a * _ ] call! 50";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(25);
+})
+// Call a tape executor:10 ends here
+
 // Reference closures
 
 // [[file:../literate/InterpreterTests.org::*Reference closures][Reference closures:1]]
@@ -605,6 +640,22 @@ it("Simple Inline tape", async () => {
     expect(result).toBe(7);
 })
 // Inline tapes:1 ends here
+
+// [[file:../literate/InterpreterTests.org::*Inline tapes][Inline tapes:2]]
+it("Inline tape can reference value outside it", async () => {
+    const input = "a: 5 { a, 1 + _ }, 7 + _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(13);
+})
+// Inline tapes:2 ends here
+
+// [[file:../literate/InterpreterTests.org::*Inline tapes][Inline tapes:3]]
+it("Inline tape can set value outside it", async () => {
+    const input = "a: 5 { 11, @a set! } a, a * _ ";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(121);
+})
+// Inline tapes:3 ends here
 
 // Aliasing blocks
 

@@ -341,6 +341,23 @@ it("Conditional jump with falsy conditional doesn't jump", async () => {
     expect(result).toBe(8);
 })
 #+end_src
+* If
+
+#+begin_src js
+it("True if", async () => {
+    const input = "1 if! { 5, @a set! } a: 4";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+#+end_src
+
+#+begin_src js
+it("false if", async () => {
+    const input = "0 if! { 5, @a set! } a: 4";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(4);
+})
+#+end_src
 
 * Equal executor
 
@@ -563,6 +580,22 @@ it("Call a tape with a user-defined operator call executor", async () => {
 })
 #+end_src
 
+#+begin_src js
+it("Call a tape which sets a value outside its scope", async () => {
+    const input = "a: 5 [ 10, @a set! ] call! a, a * _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(100);
+})
+#+end_src
+
+#+begin_src js
+it("Call a tape which references a value outside its scope", async () => {
+    const input = "a: 5 [ a, a * _ ] call! 50";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(25);
+})
+#+end_src
+
 * Reference closures
 #+begin_src js
 it("Call an empty tape has no effect", async () => {
@@ -577,6 +610,22 @@ it("Simple Inline tape", async () => {
     const input = "{ 1, 2 + _ }, 4 + _";
     const [ result ] = await interpretFile(input);
     expect(result).toBe(7);
+})
+#+end_src
+
+#+begin_src js
+it("Inline tape can reference value outside it", async () => {
+    const input = "a: 5 { a, 1 + _ }, 7 + _";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(13);
+})
+#+end_src
+
+#+begin_src js
+it("Inline tape can set value outside it", async () => {
+    const input = "a: 5 { 11, @a set! } a, a * _ ";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(121);
 })
 #+end_src
 

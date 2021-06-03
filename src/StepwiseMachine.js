@@ -144,11 +144,25 @@ export const definition = {
 
 // Inline tapes are like normal tapes, but they immediately execute, and their result goes immediately into the originating frame's arguments. This is similar to parentheses in algebraic languages. This state handles executing the tape, but where the result goes depends on pop.
 
+// Just like when we execute a normal value, if there is a comma preceding the current block, we grow the argument list by appending the current block. If there is no comma, the argument list will only contain the current block, dumping its previous contents.
+
 
 // [[file:../literate/StepwiseMachine.org::*Definition][Definition:7]]
                 executeInlineTape : {
+                    always: [
+                         {
+                             cond: "isCommaAtHead",
+                             target: "callInlineTape",
+                         },
+                         {
+                             target: "callInlineTape",
+                             actions: [ "clearArguments" ]
+                         }
+                    ]
+                },
+                callInlineTape : {
+                    always: "no_advance",
                     entry: "callInlineTape",
-                    always: "no_advance"
                 },
 // Definition:7 ends here
 
@@ -186,6 +200,7 @@ export const definition = {
                     on: {
                         DONE: { target: "advance", actions: [ "clearArguments" ] },
                         DONE_NO_ADVANCE: { target: "no_advance" },
+                        DONE_SKIP_NEXT_BLOCK: { target: "no_advance", actions: [ "exec_skipNextBlock" ] },
                         EXPLICIT_RETURN: { target: "return" },
                         CLEAR_ARGUMENTS: { actions: [ "clearArguments" ] },
                         CALL_TAPE : { actions: [ "exec_callTape" ] },
@@ -538,13 +553,11 @@ export const config = {
 
 // Unlike normal adding to arguments, we don't check whether there is a comma, and whether we should clear the arguments list. Instead, this happens before we call the inline tape, elsewhere.
 
-// Unlike normal tapes, inline tapes must have a result.
-
 
 // [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:14]]
         appendArgumentsOnLowerFrame : assign((C, E) => {
             const [ block ] = C.activeFrame.arguments;
-            if (! block) throw new Error("Inline tape did not return a result");
+            if (! block || block.is(Category.Value, "Blank")) return;
 
             if (block.is(Category.Value, "ValueIdentifier")) {
                 block = Utils.resolveAndGet(C, block);
@@ -572,10 +585,14 @@ export const config = {
             return { type : "RESPONSE_EXECUTOR", block };
         }, { to: "executor" }),
         exec_placeBlockAtAddress : assign((C, E) => {
-            C.activeFrame.setBlockByLabel(E.address.identifier, E.block);
+            Utils.resolveAndSet(C, E.address, E.block);
         }),
         exec_moveHeadToAddress : assign((C, E) => {
             C.activeFrame.moveHeadToLabel(E.address.identifier);
+        }),
+        exec_skipNextBlock : assign((C, E) => {
+            // Two because normally we would advance
+            C.activeFrame.moveHeadN(2);
         }),
 // Configuration:15 ends here
 
@@ -777,37 +794,63 @@ export const Utils = {
 
 
 
-// Further utilities using the above.
+// Ditto to set a block.
 
 
 // [[file:../literate/StepwiseMachine.org::*Utils][Utils:5]]
-    resolveAndGet(C, block) {
-        return Utils.getBlock(C, Utils.resolve(C, block, C.activeFrame));
+    setBlock(C, { type, label, frameId }, block) {
+        if (type == "closed") {
+            C.deadFrameIdsToLabelsToClosedCells[frameId][label] = block;
+            return;
+        }
+        else if (type == "stack") {
+            const frame = Utils.getFrameById(C, frameId);
+
+            frame.setBlockByLabel(label, block);
+            return;
+        }
+
+        throw new Error(`Unable to set block for resolution ${type}-${label}-${frameId}`)
     },
 // Utils:5 ends here
+
+
+
+// Further utilities using the above.
+
+
+// [[file:../literate/StepwiseMachine.org::*Utils][Utils:6]]
+    resolveAndGet(C, identifier) {
+        return Utils.getBlock(C, Utils.resolve(C, identifier, C.activeFrame));
+    },
+
+    resolveAndSet(C, identifier, block) {
+        return Utils.setBlock(C, Utils.resolve(C, identifier, C.activeFrame), block);
+    },
+// Utils:6 ends here
 
 
 
 // Find a frame on the stack by its ID
 
 
-// [[file:../literate/StepwiseMachine.org::*Utils][Utils:6]]
+// [[file:../literate/StepwiseMachine.org::*Utils][Utils:7]]
     getFrameById(C, id) {
         if (C.activeFrame.id == id) return C.activeFrame;
 
         // ID's are unique, so order shouldn't matter.
         return C.stack.find((frame) => frame.id == id);
     },
-// Utils:6 ends here
+// Utils:7 ends here
 
 
 
 // Close utils.
 
 
-// [[file:../literate/StepwiseMachine.org::*Utils][Utils:7]]
+// [[file:../literate/StepwiseMachine.org::*Utils][Utils:8]]
 }
-// Utils:7 ends here
+// Utils:8 ends here
 
 // Initialize
 
