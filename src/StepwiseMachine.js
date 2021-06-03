@@ -208,6 +208,7 @@ export const definition = {
                         PLACE_BLOCK_AT_ADDRESS : { actions: [ "exec_placeBlockAtAddress" ] },
                         MOVE_HEAD_TO_ADDRESS : { actions: [ "exec_moveHeadToAddress" ]},
                         REQUEST_BLOCK_AT_ADDRESS : { actions: [ "exec_reqBlockAtAddress" ] },
+                        SET_SHOULD_EXECUTE_ELSE : { actions: [ "exec_setShouldExecuteElse" ] },
                     }
                 },
 // Definition:9 ends here
@@ -584,6 +585,9 @@ export const config = {
             const block = Utils.resolveAndGet(C, E.address);
             return { type : "RESPONSE_EXECUTOR", block };
         }, { to: "executor" }),
+        exec_setShouldExecuteElse: assign((C, E) => {
+            C.shouldExecuteElse = E.should;
+        }),
         exec_placeBlockAtAddress : assign((C, E) => {
             Utils.resolveAndSet(C, E.address, E.block);
         }),

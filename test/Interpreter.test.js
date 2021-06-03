@@ -376,6 +376,25 @@ it("false if", async () => {
 })
 // If:2 ends here
 
+// If/Else
+
+
+// [[file:../literate/InterpreterTests.org::*If/Else][If/Else:1]]
+it("True if/else", async () => {
+    const input = "1 if! { 5, @a set! } else! { 6, @a set! } a: 4";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+// If/Else:1 ends here
+
+// [[file:../literate/InterpreterTests.org::*If/Else][If/Else:2]]
+it("False if/else", async () => {
+    const input = "0 if! { 5, @a set! } else! { 6, @a set! } a: 4";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(6);
+})
+// If/Else:2 ends here
+
 // Equal executor
 
 

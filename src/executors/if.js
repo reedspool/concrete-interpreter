@@ -15,11 +15,13 @@ export const service = (C) => (sendParent, receiveParent) => {
 
     // If the test is true, proceed without doing anything
     if (block.truthy()) {
+        sendParent({ type: "SET_SHOULD_EXECUTE_ELSE", should: false });
         sendParent("DONE");
         return;
     }
 
     // If the test is falsy, skip the conditional body and continue as normal
+    sendParent({ type: "SET_SHOULD_EXECUTE_ELSE", should: true });
     sendParent({ type: "DONE_SKIP_NEXT_BLOCK" });
 };
 // No heading:1 ends here

@@ -359,6 +359,24 @@ it("false if", async () => {
 })
 #+end_src
 
+* If/Else
+
+#+begin_src js
+it("True if/else", async () => {
+    const input = "1 if! { 5, @a set! } else! { 6, @a set! } a: 4";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(5);
+})
+#+end_src
+
+#+begin_src js
+it("False if/else", async () => {
+    const input = "0 if! { 5, @a set! } else! { 6, @a set! } a: 4";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(6);
+})
+#+end_src
+
 * Equal executor
 
 #+begin_src js
