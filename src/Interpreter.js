@@ -12,6 +12,7 @@ import { service as setExecutorService } from "./executors/set";
 import { service as setInfixExecutorService } from "./executors/setInfix";
 import { service as ifExecutorService } from "./executors/if";
 import { service as elseExecutorService } from "./executors/else";
+import { service as whileExecutorService } from "./executors/while";
 import { service as jumpExecutorService } from "./executors/jump";
 import { service as callExecutorService } from "./executors/call";
 import { service as printExecutorService } from "./executors/print";
@@ -106,6 +107,7 @@ export const interpretFile = async (source) => {
         { label: "->", service: setInfixExecutorService },
         { label: "if", service: ifExecutorService },
         { label: "else", service: elseExecutorService },
+        { label: "while", service: whileExecutorService },
         { label: "jump", service: jumpExecutorService },
         { label: "call", service: callExecutorService },
         { label: "print", service: printExecutorService },

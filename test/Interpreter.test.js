@@ -395,6 +395,20 @@ it("False if/else", async () => {
 })
 // If/Else:2 ends here
 
+// While
+// :PROPERTIES:
+// :CREATED:  [2021-06-02 Wed 20:13]
+// :END:
+
+
+// [[file:../literate/InterpreterTests.org::*While][While:1]]
+it("Simple while loop", async () => {
+    const input = "a: 3 while! { a, b + _, @b set! a, 1 - _, @a set! } b: 0";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(6);
+})
+// While:1 ends here
+
 // Equal executor
 
 

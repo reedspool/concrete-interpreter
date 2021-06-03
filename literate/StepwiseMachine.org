@@ -188,6 +188,7 @@ This first important action is a way to replicate the "onDone" above for those s
                         MOVE_HEAD_TO_ADDRESS : { actions: [ "exec_moveHeadToAddress" ]},
                         REQUEST_BLOCK_AT_ADDRESS : { actions: [ "exec_reqBlockAtAddress" ] },
                         SET_SHOULD_EXECUTE_ELSE : { actions: [ "exec_setShouldExecuteElse" ] },
+                        SET_JUMP_AFTER_N : { actions: [ "exec_setShouldJumpAfterN" ] },
                     }
                 },
 #+end_src
@@ -221,13 +222,22 @@ After advancing, we go "back to the top" in the read-eval-advance cycle, first c
                 advance: {
                     entry: [ "reportReadyToStep" ],
                     on : {
-                        STEP: {
-                            target: "checkPastTapeEdge",
-                            actions: [ "advanceHead" ]
-                        }
+                        STEP: [
+                            {
+                                cond: "shouldJumpAfterN",
+                                target: "read",
+                                actions: [ "jumpAfterN" ]
+                            },
+                            {
+                                target: "checkPastTapeEdge",
+                                actions: [ "advanceHead", "decrementJumpAfterN" ]
+                            }
+                        ]
                     }
                 },
 #+end_src
+
+#+RESULTS:
 
 For those executors which do not advance the head, we still want the step machine to act the same way, so make the same exact state but which does not advance.
 
@@ -235,9 +245,17 @@ For those executors which do not advance the head, we still want the step machin
                 no_advance: {
                     entry: [ "reportReadyToStep" ],
                     on : {
-                        STEP: {
-                            target: "checkPastTapeEdge",
-                        }
+                        STEP: [
+                            {
+                                cond: "shouldJumpAfterN",
+                                target: "checkPastTapeEdge",
+                                actions: [ "jumpAfterN" ]
+                            },
+                            {
+                               target: "checkPastTapeEdge",
+                               actions: [ "decrementJumpAfterN" ]
+                            }
+                        ]
                     }
                 },
 #+end_src
@@ -497,6 +515,20 @@ There are a huge number of actions that op block executors can take in the cours
         exec_setShouldExecuteElse: assign((C, E) => {
             C.shouldExecuteElse = E.should;
         }),
+        exec_setShouldJumpAfterN : assign((C, E) => {
+            C.activeFrame.shouldJumpAfterN = E.n;
+            C.activeFrame.jumpTarget = E.target;
+        }),
+        decrementJumpAfterN : assign((C, E) => {
+            if (typeof C.activeFrame.shouldJumpAfterN == "number") {
+                C.activeFrame.shouldJumpAfterN -= 1;
+            }
+        }),
+        jumpAfterN : assign((C, E) => {
+            C.activeFrame.shouldJumpAfterN = null;
+            C.activeFrame.moveHeadToIndex(C.activeFrame.jumpTarget);
+            C.activeFrame.jumpTarget = null;
+        }),
         exec_placeBlockAtAddress : assign((C, E) => {
             Utils.resolveAndSet(C, E.address, E.block);
         }),
@@ -541,6 +573,12 @@ We need to check the category of the current block in order to branch execution.
         isCurrentBlockInlineTapeAndCommaAtHead : (C, E) => C.currentBlock.is(Category.Value, "Tape") && C.currentBlock.isInline && C.activeFrame.isCommaAtHead(),
         isCurrentBlockOp : (C, E) => C.currentBlock.is(Category.Op),
         isCurrentTapeInline: (C, E) => C.activeFrame.tape.isInline,
+#+end_src
+
+C.activeFrame.shouldJumpAfterN is a countdown. When it is 0, it's time to jump.
+
+#+begin_src js
+        shouldJumpAfterN: (C, E) => (typeof C.activeFrame.shouldJumpAfterN == "number") && C.activeFrame.shouldJumpAfterN == 0,
 #+end_src
 
 Given the current block, return the executor service that matches it.

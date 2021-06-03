@@ -125,6 +125,8 @@ At a frame's end of life, all captured references become closed references. Clos
 
     moveHeadN(n) { this.head += n; }
 
+    moveHeadToIndex(index) { this.head = index; }
+
     getBlockByLabel(label) {
         const { type, index } = this.tape.references[label];
 

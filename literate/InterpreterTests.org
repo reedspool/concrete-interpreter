@@ -377,6 +377,19 @@ it("False if/else", async () => {
 })
 #+end_src
 
+* While
+:PROPERTIES:
+:CREATED:  [2021-06-02 Wed 20:13]
+:END:
+
+#+begin_src js
+it("Simple while loop", async () => {
+    const input = "a: 3 while! { a, b + _, @b set! a, 1 - _, @a set! } b: 0";
+    const [ result ] = await interpretFile(input);
+    expect(result).toBe(6);
+})
+#+end_src
+
 * Equal executor
 
 #+begin_src js

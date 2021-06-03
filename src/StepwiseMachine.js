@@ -209,6 +209,7 @@ export const definition = {
                         MOVE_HEAD_TO_ADDRESS : { actions: [ "exec_moveHeadToAddress" ]},
                         REQUEST_BLOCK_AT_ADDRESS : { actions: [ "exec_reqBlockAtAddress" ] },
                         SET_SHOULD_EXECUTE_ELSE : { actions: [ "exec_setShouldExecuteElse" ] },
+                        SET_JUMP_AFTER_N : { actions: [ "exec_setShouldJumpAfterN" ] },
                     }
                 },
 // Definition:9 ends here
@@ -248,15 +249,24 @@ export const definition = {
                 advance: {
                     entry: [ "reportReadyToStep" ],
                     on : {
-                        STEP: {
-                            target: "checkPastTapeEdge",
-                            actions: [ "advanceHead" ]
-                        }
+                        STEP: [
+                            {
+                                cond: "shouldJumpAfterN",
+                                target: "read",
+                                actions: [ "jumpAfterN" ]
+                            },
+                            {
+                                target: "checkPastTapeEdge",
+                                actions: [ "advanceHead", "decrementJumpAfterN" ]
+                            }
+                        ]
                     }
                 },
 // Definition:11 ends here
 
 
+
+// #+RESULTS:
 
 // For those executors which do not advance the head, we still want the step machine to act the same way, so make the same exact state but which does not advance.
 
@@ -265,9 +275,17 @@ export const definition = {
                 no_advance: {
                     entry: [ "reportReadyToStep" ],
                     on : {
-                        STEP: {
-                            target: "checkPastTapeEdge",
-                        }
+                        STEP: [
+                            {
+                                cond: "shouldJumpAfterN",
+                                target: "checkPastTapeEdge",
+                                actions: [ "jumpAfterN" ]
+                            },
+                            {
+                               target: "checkPastTapeEdge",
+                               actions: [ "decrementJumpAfterN" ]
+                            }
+                        ]
                     }
                 },
 // Definition:12 ends here
@@ -588,6 +606,20 @@ export const config = {
         exec_setShouldExecuteElse: assign((C, E) => {
             C.shouldExecuteElse = E.should;
         }),
+        exec_setShouldJumpAfterN : assign((C, E) => {
+            C.activeFrame.shouldJumpAfterN = E.n;
+            C.activeFrame.jumpTarget = E.target;
+        }),
+        decrementJumpAfterN : assign((C, E) => {
+            if (typeof C.activeFrame.shouldJumpAfterN == "number") {
+                C.activeFrame.shouldJumpAfterN -= 1;
+            }
+        }),
+        jumpAfterN : assign((C, E) => {
+            C.activeFrame.shouldJumpAfterN = null;
+            C.activeFrame.moveHeadToIndex(C.activeFrame.jumpTarget);
+            C.activeFrame.jumpTarget = null;
+        }),
         exec_placeBlockAtAddress : assign((C, E) => {
             Utils.resolveAndSet(C, E.address, E.block);
         }),
@@ -648,6 +680,15 @@ export const config = {
 
 
 
+// C.activeFrame.shouldJumpAfterN is a countdown. When it is 0, it's time to jump.
+
+
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:20]]
+        shouldJumpAfterN: (C, E) => (typeof C.activeFrame.shouldJumpAfterN == "number") && C.activeFrame.shouldJumpAfterN == 0,
+// Configuration:20 ends here
+
+
+
 // Given the current block, return the executor service that matches it.
 
 // First, resolve the identifier to see where it points. If it points to a tape in the machine, then use our callUserTapeExecutorService. callUserTapeExecutorService takes an extra parameter in addition to the context, the resolved tape; this is for convenience, as otherwise it would have to resolve the same block again itself.
@@ -657,7 +698,7 @@ export const config = {
 // Before returning, invoke the service creator with the current context. Because we are using Immer, the service won't be able to edit anything about the context.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:20]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:21]]
     },
     services: {
         dispatchOnExecutor : (C, E) => {
@@ -676,17 +717,17 @@ export const config = {
 
             return executor(C);
         }
-// Configuration:20 ends here
+// Configuration:21 ends here
 
 
 
 // Close final config map.
 
 
-// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:21]]
+// [[file:../literate/StepwiseMachine.org::*Configuration][Configuration:22]]
     }
 }
-// Configuration:21 ends here
+// Configuration:22 ends here
 
 // Utils
 
